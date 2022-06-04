@@ -81,9 +81,6 @@ pub enum SupplyChainAction {
     /// * [`msg::source()`](gstd::msg::source) must be a producer in a supply chain
     /// and a producer of this item.
     /// * Item's [`ItemState`] must be [`PurchasedByDistributor`](ItemState::PurchasedByDistributor).
-    ///
-    /// Arguments:
-    /// * `item_id`: an item's ID.
     ShipByProducer(ItemId),
 
     /// Receives a shipped item from a producer on behalf of a distributor.\
@@ -96,9 +93,6 @@ pub enum SupplyChainAction {
     /// * [`msg::source()`](gstd::msg::source) must be a distributor in a supply chain
     /// and a distributor of this item.
     /// * Item's [`ItemState`] must be [`ShippedByProducer`](ItemState::ShippedByProducer).
-    ///
-    /// Arguments:
-    /// * `item_id`: an item's ID.
     ReceiveByDistributor(ItemId),
 
     /// Processes a received item from a producer on behalf of a distributor.
@@ -107,9 +101,6 @@ pub enum SupplyChainAction {
     /// * [`msg::source()`](gstd::msg::source) must be a distributor in a supply chain
     /// and a distributor of this item.
     /// * Item's [`ItemState`] must be [`ReceivedByDistributor`](ItemState::ReceivedByDistributor).
-    ///
-    /// Arguments:
-    /// * `item_id`: an item's ID.
     ProcessByDistributor(ItemId),
 
     /// Packages a processed item on behalf of a distributor.
@@ -118,9 +109,6 @@ pub enum SupplyChainAction {
     /// * [`msg::source()`](gstd::msg::source) must be a distributor in a supply chain
     /// and a distributor of this item.
     /// * Item's [`ItemState`] must be [`ProcessedByDistributor`](ItemState::ProcessedByDistributor).
-    ///
-    /// Arguments:
-    /// * `item_id`: an item's ID.
     PackageByDistributor(ItemId),
 
     /// Puts a packaged item up for a sale to a retailer
@@ -174,9 +162,6 @@ pub enum SupplyChainAction {
     /// * [`msg::source()`](gstd::msg::source) must be a distributor in a supply chain
     /// and a distributor of this item.
     /// * Item's [`ItemState`] must be [`PurchasedByRetailer`](ItemState::PurchasedByRetailer).
-    ///
-    /// Arguments:
-    /// * `item_id`: an item's ID.
     ShipByDistributor(ItemId),
 
     /// Receives a shipped item from a distributor on behalf of a retailer.\
@@ -189,9 +174,6 @@ pub enum SupplyChainAction {
     /// * [`msg::source()`](gstd::msg::source) must be a retailer in a supply chain
     /// and a retailer of this item.
     /// * Item's [`ItemState`] must be [`ShippedByDistributor`](ItemState::ShippedByDistributor).
-    ///
-    /// Arguments:
-    /// * `item_id`: an item's ID.
     ReceiveByRetailer(ItemId),
 
     /// Puts a received item from a distributor up for a sale to a consumer
@@ -214,9 +196,6 @@ pub enum SupplyChainAction {
     ///
     /// Requirements:
     /// * Item's [`ItemState`] must be [`ForSaleByRetailer`](ItemState::ForSaleByRetailer).
-    ///
-    /// Arguments:
-    /// * `item_id`: an item's ID.
     PurchaseByConsumer(ItemId),
 }
 
