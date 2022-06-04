@@ -6,8 +6,6 @@
 
 # Supply chain
 
-An example of a supply chain smart contract.
-
 [![Build][build_badge]][build_href]
 [![License][lic_badge]][lic_href]
 
@@ -17,7 +15,7 @@ An example of a supply chain smart contract.
 [lic_badge]: https://img.shields.io/badge/License-GPL%203.0-success
 [lic_href]: https://github.com/gear-dapps/supply-chain/blob/master/LICENSE
 
-Template application. Use this repository as a template when creating a new application repo.
+An example of a supply chain smart contract.
 
 ## Prebuilt Binaries
 
