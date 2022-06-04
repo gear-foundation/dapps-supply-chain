@@ -17,20 +17,206 @@ pub struct InitSupplyChain {
 
 #[derive(Encode, Decode, TypeInfo)]
 pub enum SupplyChainAction {
+    /// Produces one item with a name and notes and replies with its ID.\
+    /// Transfers created NFT for an item to a producer.
+    ///
+    /// Requirements:
+    /// * [`msg::source()`](gstd::msg::source) must be a producer in a supply chain.
+    ///
+    /// Arguments:
+    /// * `name`: an item's name.
+    /// * `notes`: an item's notes.
     Produce { name: String, notes: String },
+
+    /// Puts an item up for a sale to a distributor for a given price
+    /// on behalf of a producer.\
+    /// Transfers item's NFT to a supply chain.
+    ///
+    /// Requirements:
+    /// * [`msg::source()`](gstd::msg::source) must be a producer in a supply chain
+    /// and a producer of this item.
+    /// * Item's [`ItemState`] must be [`Produced`](ItemState::Produced).
+    ///
+    /// Arguments:
+    /// * `item_id`: an item's ID.
+    /// * `price`: an item's price.
     PutUpForSaleByProducer { item_id: ItemId, price: u128 },
+
+    /// Purchases an item from a producer on behalf of a distributor.\
+    /// Transfers tokens for purchasing an item to a supply chain
+    /// until an item is received (by [`SupplyChainAction::ReceiveByDistributor`]).\
+    /// Note that an item's producer must approve or not this purchase by
+    /// [`SupplyChainAction::ApproveByProducer`].
+    ///
+    /// Requirements:
+    /// * [`msg::source()`](gstd::msg::source) must be a distributor in a supply chain.
+    /// * Item's [`ItemState`] must be [`ForSaleByProducer`](ItemState::ForSaleByProducer).
+    ///
+    /// Arguments:
+    /// * `item_id`: an item's ID.
+    /// * `delivery_time`: a time in milliseconds for which a producer must deliver an item.
+    /// A countdown starts after [`SupplyChainAction::ShipByProducer`] is executed.
     PurchaseByDistributor { item_id: ItemId, delivery_time: u64 },
+
+    /// Approves or not a purchase from a distributor on behalf of a producer.\
+    /// If a purchase is approved, then item's [`ItemState`] changes to
+    /// [`ApprovedByProducer`](ItemState::ApprovedByProducer) and an item can be shipped.\
+    /// If a purchase is **not** approved, then tokens for a purchase are refunded to an item's producer.
+    ///
+    /// Requirements:
+    /// * [`msg::source()`](gstd::msg::source) must be a producer in a supply chain
+    /// and a producer of this item.
+    /// * Item's [`ItemState`] must be [`PurchasedByDistributor`](ItemState::PurchasedByDistributor).
+    ///
+    /// Arguments:
+    /// * `item_id`: an item's ID.
+    /// * `approve`: yes ([`true`]) or no ([`false`]).
     ApproveByProducer { item_id: ItemId, approve: bool },
+
+    /// Starts shipping a purchased item to a distributor on behalf of a producer.\
+    /// Starts a countdown for a delivery time that was specified for this item in
+    /// [`SupplyChainAction::PurchaseByDistributor`].
+    ///
+    /// Requirements:
+    /// * [`msg::source()`](gstd::msg::source) must be a producer in a supply chain
+    /// and a producer of this item.
+    /// * Item's [`ItemState`] must be [`PurchasedByDistributor`](ItemState::PurchasedByDistributor).
+    ///
+    /// Arguments:
+    /// * `item_id`: an item's ID.
     ShipByProducer(ItemId),
+
+    /// Receives a shipped item from a producer on behalf of a distributor.\
+    /// Depending on a counted delivery time, transfers tokens for purchasing an item
+    /// from a supply chain to a producer or as a penalty for being late refunds some or
+    /// all of them to a distributor.\
+    /// Transfers item's NFT to a distributor.
+    ///
+    /// Requirements:
+    /// * [`msg::source()`](gstd::msg::source) must be a distributor in a supply chain
+    /// and a distributor of this item.
+    /// * Item's [`ItemState`] must be [`ShippedByProducer`](ItemState::ShippedByProducer).
+    ///
+    /// Arguments:
+    /// * `item_id`: an item's ID.
     ReceiveByDistributor(ItemId),
+
+    /// Processes a received item from a producer on behalf of a distributor.
+    ///
+    /// Requirements:
+    /// * [`msg::source()`](gstd::msg::source) must be a distributor in a supply chain
+    /// and a distributor of this item.
+    /// * Item's [`ItemState`] must be [`ReceivedByDistributor`](ItemState::ReceivedByDistributor).
+    ///
+    /// Arguments:
+    /// * `item_id`: an item's ID.
     ProcessByDistributor(ItemId),
+
+    /// Packages a processed item on behalf of a distributor.
+    ///
+    /// Requirements:
+    /// * [`msg::source()`](gstd::msg::source) must be a distributor in a supply chain
+    /// and a distributor of this item.
+    /// * Item's [`ItemState`] must be [`ProcessedByDistributor`](ItemState::ProcessedByDistributor).
+    ///
+    /// Arguments:
+    /// * `item_id`: an item's ID.
     PackageByDistributor(ItemId),
+
+    /// Puts a packaged item up for a sale to a retailer
+    /// for a given price on behalf of a distributor.\
+    /// Transfers item's NFT to a supply chain.
+    ///
+    /// Requirements:
+    /// * [`msg::source()`](gstd::msg::source) must be a distributor in a supply chain
+    /// and a distributor of this item.
+    /// * Item's [`ItemState`] must be [`PackagedByDistributor`](ItemState::PackagedByDistributor).
+    ///
+    /// Arguments:
+    /// * `item_id`: an item's ID.
+    /// * `price`: an item's price.
     PutUpForSaleByDistributor { item_id: ItemId, price: u128 },
+
+    /// Purchases an item from a distributor on behalf of a retailer.\
+    /// Transfers tokens for purchasing an item to a supply chain
+    /// until an item is received (by [`SupplyChainAction::ReceiveByRetailer`]).
+    ///
+    /// Requirements:
+    /// * [`msg::source()`](gstd::msg::source) must be a retailer in a supply chain.
+    /// * Item's [`ItemState`] must be [`ForSaleByDistributor`](ItemState::ForSaleByDistributor).
+    ///
+    /// Arguments:
+    /// * `item_id`: an item's ID.
+    /// * `delivery_time`: a time in milliseconds for which a distributor must deliver an item.
+    /// A countdown starts after [`SupplyChainAction::ShipByDistributor`] is executed.
     PurchaseByRetailer { item_id: ItemId, delivery_time: u64 },
+
+    /// Approves or not a purchase from a retailer on behalf of a distributor.\
+    /// If a purchase is approved, then item's [`ItemState`] changes to
+    /// [`ApprovedByDistributor`](ItemState::ApprovedByDistributor) and an item can be shipped.\
+    /// If a purchase is **not** approved, then tokens for a purchase are refunded to an item's distributor.
+    ///
+    /// Requirements:
+    /// * [`msg::source()`](gstd::msg::source) must be a distributor in a supply chain
+    /// and a distributor of this item.
+    /// * Item's [`ItemState`] must be [`PurchasedByRetailer`](ItemState::PurchasedByRetailer).
+    ///
+    /// Arguments:
+    /// * `item_id`: an item's ID.
+    /// * `approve`: yes ([`true`]) or no ([`false`]).
     ApproveByDistributor { item_id: ItemId, approve: bool },
+
+    /// Starts shipping a purchased item to a retailer on behalf of a distributor.\
+    /// Starts a countdown for a delivery time that was specified for this item in
+    /// [`SupplyChainAction::PurchaseByRetailer`].
+    ///
+    /// Requirements:
+    /// * [`msg::source()`](gstd::msg::source) must be a distributor in a supply chain
+    /// and a distributor of this item.
+    /// * Item's [`ItemState`] must be [`PurchasedByRetailer`](ItemState::PurchasedByRetailer).
+    ///
+    /// Arguments:
+    /// * `item_id`: an item's ID.
     ShipByDistributor(ItemId),
+
+    /// Receives a shipped item from a distributor on behalf of a retailer.\
+    /// Depending on a counted delivery time, transfers tokens for purchasing an item
+    /// from a supply chain to a distributor or as a penalty for being late refunds some or
+    /// all of them to a retailer.\
+    /// Transfers item's NFT to a retailer.
+    ///
+    /// Requirements:
+    /// * [`msg::source()`](gstd::msg::source) must be a retailer in a supply chain
+    /// and a retailer of this item.
+    /// * Item's [`ItemState`] must be [`ShippedByDistributor`](ItemState::ShippedByDistributor).
+    ///
+    /// Arguments:
+    /// * `item_id`: an item's ID.
     ReceiveByRetailer(ItemId),
+
+    /// Puts a received item from a distributor up for a sale to a consumer
+    /// for a given price on behalf of a retailer.\
+    /// Transfers item's NFT to a supply chain.
+    ///
+    /// Requirements:
+    /// * [`msg::source()`](gstd::msg::source) must be a retailer in a supply chain
+    /// and a retailer of this item.
+    /// * Item's [`ItemState`] must be [`ReceivedByRetailer`](ItemState::ReceivedByRetailer).
+    ///
+    /// Arguments:
+    /// * `item_id`: an item's ID.
+    /// * `price`: an item's price.
     PutUpForSaleByRetailer { item_id: ItemId, price: u128 },
+
+    /// Purchases an item from a retailer.\
+    /// Transfers tokens for purchasing an item to its retailer.\
+    /// Transfers item's NFT to a consumer.
+    ///
+    /// Requirements:
+    /// * Item's [`ItemState`] must be [`ForSaleByRetailer`](ItemState::ForSaleByRetailer).
+    ///
+    /// Arguments:
+    /// * `item_id`: an item's ID.
     PurchaseByConsumer(ItemId),
 }
 
@@ -43,6 +229,10 @@ pub enum SupplyChainEvent {
 
 #[derive(Encode, Decode, TypeInfo)]
 pub enum SupplyChainState {
+    /// Gets [`ItemInfo`].
+    ///
+    /// Arguments:
+    /// * `item_id`: an item's ID.
     GetItemInfo(ItemId),
 }
 
