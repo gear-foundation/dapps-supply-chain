@@ -16,6 +16,12 @@ fn panic_item_not_exist(item_id: ItemId) -> ! {
     panic!("Item with the {item_id} ID doesn't exist")
 }
 
+fn get_mut_item(items: &mut BTreeMap<ItemId, Item>, id: ItemId) -> &mut Item {
+    items
+        .get_mut(&id)
+        .unwrap_or_else(|| panic_item_not_exist(id))
+}
+
 async fn transfer_tokens(ft_program_id: ActorId, from: ActorId, to: ActorId, amount: u128) {
     msg::send_and_wait_for_reply::<FTEvent, _>(
         ft_program_id,
@@ -146,10 +152,7 @@ impl SupplyChain {
 
     async fn put_up_for_sale_by_producer(&mut self, item_id: ItemId, price: u128) {
         self.check_producer();
-        let item = self
-            .items
-            .get_mut(&item_id)
-            .unwrap_or_else(|| panic_item_not_exist(item_id));
+        let item = get_mut_item(&mut self.items, item_id);
         assert_eq!(item.info.state, ItemState::Produced);
         assert_eq!(item.info.producer, msg::source());
 
@@ -162,11 +165,7 @@ impl SupplyChain {
 
     async fn purchase_by_distributor(&mut self, item_id: ItemId, delivery_time: u64) {
         self.check_distributor();
-        let item = self
-            .items
-            .get_mut(&item_id)
-            .unwrap_or_else(|| panic_item_not_exist(item_id));
-        assert_eq!(item.info.state, ItemState::ForSaleByProducer);
+        let item = get_mut_item(&mut self.items, item_id);
 
         transfer_tokens(
             self.ft_program_id,
@@ -184,10 +183,7 @@ impl SupplyChain {
 
     async fn approve_by_producer(&mut self, item_id: ItemId, approve: bool) {
         self.check_producer();
-        let item = self
-            .items
-            .get_mut(&item_id)
-            .unwrap_or_else(|| panic_item_not_exist(item_id));
+        let item = get_mut_item(&mut self.items, item_id);
         assert_eq!(item.info.state, ItemState::PurchasedByDistributor);
         assert_eq!(item.info.producer, msg::source());
 
@@ -209,10 +205,7 @@ impl SupplyChain {
 
     fn ship_by_producer(&mut self, item_id: ItemId) {
         self.check_producer();
-        let item = self
-            .items
-            .get_mut(&item_id)
-            .unwrap_or_else(|| panic_item_not_exist(item_id));
+        let item = get_mut_item(&mut self.items, item_id);
         assert_eq!(item.info.state, ItemState::ApprovedByProducer);
         assert_eq!(item.info.producer, msg::source());
 
@@ -224,10 +217,7 @@ impl SupplyChain {
 
     async fn receive_by_distributor(&mut self, item_id: ItemId) {
         self.check_distributor();
-        let item = self
-            .items
-            .get_mut(&item_id)
-            .unwrap_or_else(|| panic_item_not_exist(item_id));
+        let item = get_mut_item(&mut self.items, item_id);
         assert_eq!(item.info.state, ItemState::ShippedByProducer);
         assert_eq!(item.info.distributor, msg::source());
 
@@ -240,10 +230,7 @@ impl SupplyChain {
 
     fn process_by_distributor(&mut self, item_id: ItemId) {
         self.check_distributor();
-        let item = self
-            .items
-            .get_mut(&item_id)
-            .unwrap_or_else(|| panic_item_not_exist(item_id));
+        let item = get_mut_item(&mut self.items, item_id);
         assert_eq!(item.info.state, ItemState::ReceivedByDistributor);
         assert_eq!(item.info.distributor, msg::source());
 
@@ -253,10 +240,7 @@ impl SupplyChain {
 
     fn package_by_distributor(&mut self, item_id: ItemId) {
         self.check_distributor();
-        let item = self
-            .items
-            .get_mut(&item_id)
-            .unwrap_or_else(|| panic_item_not_exist(item_id));
+        let item = get_mut_item(&mut self.items, item_id);
         assert_eq!(item.info.state, ItemState::ProcessedByDistributor);
         assert_eq!(item.info.distributor, msg::source());
 
@@ -266,10 +250,7 @@ impl SupplyChain {
 
     async fn put_up_for_sale_by_distributor(&mut self, item_id: ItemId, price: u128) {
         self.check_distributor();
-        let item = self
-            .items
-            .get_mut(&item_id)
-            .unwrap_or_else(|| panic_item_not_exist(item_id));
+        let item = get_mut_item(&mut self.items, item_id);
         assert_eq!(item.info.state, ItemState::PackagedByDistributor);
         assert_eq!(item.info.distributor, msg::source());
 
@@ -282,10 +263,7 @@ impl SupplyChain {
 
     async fn purchase_by_retailer(&mut self, item_id: ItemId, delivery_time: u64) {
         self.check_retailer();
-        let item = self
-            .items
-            .get_mut(&item_id)
-            .unwrap_or_else(|| panic_item_not_exist(item_id));
+        let item = get_mut_item(&mut self.items, item_id);
         assert_eq!(item.info.state, ItemState::ForSaleByDistributor);
 
         transfer_tokens(
@@ -304,10 +282,7 @@ impl SupplyChain {
 
     async fn approve_by_distributor(&mut self, item_id: ItemId, approve: bool) {
         self.check_distributor();
-        let item = self
-            .items
-            .get_mut(&item_id)
-            .unwrap_or_else(|| panic_item_not_exist(item_id));
+        let item = get_mut_item(&mut self.items, item_id);
         assert_eq!(item.info.state, ItemState::PurchasedByRetailer);
         assert_eq!(item.info.distributor, msg::source());
 
@@ -329,10 +304,7 @@ impl SupplyChain {
 
     fn ship_by_distributor(&mut self, item_id: ItemId) {
         self.check_distributor();
-        let item = self
-            .items
-            .get_mut(&item_id)
-            .unwrap_or_else(|| panic_item_not_exist(item_id));
+        let item = get_mut_item(&mut self.items, item_id);
         assert_eq!(item.info.state, ItemState::ApprovedByDistributor);
         assert_eq!(item.info.distributor, msg::source());
 
@@ -344,10 +316,7 @@ impl SupplyChain {
 
     async fn receive_by_retailer(&mut self, item_id: ItemId) {
         self.check_retailer();
-        let item = self
-            .items
-            .get_mut(&item_id)
-            .unwrap_or_else(|| panic_item_not_exist(item_id));
+        let item = get_mut_item(&mut self.items, item_id);
         assert_eq!(item.info.state, ItemState::ShippedByDistributor);
         assert_eq!(item.info.retailer, msg::source());
 
@@ -360,10 +329,7 @@ impl SupplyChain {
 
     async fn put_up_for_sale_by_retailer(&mut self, item_id: ItemId, price: u128) {
         self.check_retailer();
-        let item = self
-            .items
-            .get_mut(&item_id)
-            .unwrap_or_else(|| panic_item_not_exist(item_id));
+        let item = get_mut_item(&mut self.items, item_id);
         assert_eq!(item.info.state, ItemState::ReceivedByRetailer);
         assert_eq!(item.info.retailer, msg::source());
 
@@ -375,10 +341,7 @@ impl SupplyChain {
     }
 
     async fn purchase_by_consumer(&mut self, item_id: ItemId) {
-        let item = self
-            .items
-            .get_mut(&item_id)
-            .unwrap_or_else(|| panic_item_not_exist(item_id));
+        let item = get_mut_item(&mut self.items, item_id);
         assert_eq!(item.info.state, ItemState::ForSaleByRetailer);
 
         transfer_tokens(
