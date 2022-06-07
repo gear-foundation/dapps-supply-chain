@@ -31,10 +31,7 @@ pub fn init_system() -> System {
 }
 
 pub fn init_ft_program(system: &System) -> Program {
-    let ft_program = Program::from_file(
-        system,
-        "./target/fungible_token.opt.wasm",
-    );
+    let ft_program = Program::from_file(system, "./target/fungible_token.opt.wasm");
 
     assert!(ft_program
         .send(
@@ -51,10 +48,7 @@ pub fn init_ft_program(system: &System) -> Program {
 }
 
 pub fn init_nft_program(system: &System) -> Program {
-    let nft_program = Program::from_file(
-        system,
-        "./target/nft.opt.wasm",
-    );
+    let nft_program = Program::from_file(system, "./target/nft.opt.wasm");
 
     assert!(nft_program
         .send(
