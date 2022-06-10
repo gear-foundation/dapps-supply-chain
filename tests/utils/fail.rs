@@ -5,8 +5,8 @@ pub fn produce(supply_chain_program: &Program, user: u64) {
         .send(
             user,
             SupplyChainAction::Produce {
-                name: "".into(),
-                notes: "".into(),
+                name: Default::default(),
+                description: Default::default(),
             },
         )
         .main_failed());

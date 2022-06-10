@@ -1,7 +1,7 @@
 #![no_std]
 
 use ft_io::{FTAction, FTEvent};
-use gear_lib::non_fungible_token::io::NFTTransfer;
+use gear_lib::non_fungible_token::{io::NFTTransfer, token::TokenMetadata};
 use gstd::{async_main, exec, msg, prelude::*, ActorId};
 use nft_io::NFTAction;
 use supply_chain_io::*;
@@ -41,7 +41,7 @@ async fn transfer_nft(nft_program_id: ActorId, to: ActorId, token_id: ItemId) {
     )
     .unwrap()
     .await
-    .expect("Unable to decode NFTEvent");
+    .expect("Unable to decode NFTTransfer");
 }
 
 async fn receive(ft_program_id: ActorId, seller: ActorId, item: &Item) {
@@ -108,13 +108,17 @@ impl SupplyChain {
         }
     }
 
-    async fn produce_item(&mut self, name: String, notes: String) {
+    async fn produce_item(&mut self, name: String, description: String) {
         self.check_producer();
 
         let raw_reply: Vec<u8> = msg::send_and_wait_for_reply(
             self.nft_program_id,
             NFTAction::Mint {
-                token_metadata: Default::default(),
+                token_metadata: TokenMetadata {
+                    name,
+                    description,
+                    ..Default::default()
+                },
             },
             0,
         )
@@ -139,8 +143,6 @@ impl SupplyChain {
             item_id,
             Item {
                 info: ItemInfo {
-                    name,
-                    notes,
                     producer: msg::source(),
                     ..Default::default()
                 },
@@ -395,7 +397,7 @@ pub async fn main() {
     let action = msg::load().expect("Unable to decode SupplyChainAction");
     let supply_chain = unsafe { SUPPLY_CHAIN.get_or_insert(Default::default()) };
     match action {
-        SupplyChainAction::Produce { name, notes } => supply_chain.produce_item(name, notes).await,
+        SupplyChainAction::Produce { name, description } => supply_chain.produce_item(name, description).await,
         SupplyChainAction::PutUpForSaleByProducer { item_id, price } => {
             supply_chain
                 .put_up_for_sale_by_producer(item_id, price)

@@ -4,7 +4,7 @@ pub fn produce(
     supply_chain_program: &Program,
     producer: u64,
     name: &str,
-    notes: &str,
+    description: &str,
 
     item_id: u128,
 ) {
@@ -13,7 +13,7 @@ pub fn produce(
             producer,
             SupplyChainAction::Produce {
                 name: name.into(),
-                notes: notes.into(),
+                description: description.into(),
             },
         )
         .contains(&(

@@ -6,9 +6,8 @@ license = "GPL-3.0"
 authors = ["Gear Technologies"]
 
 [dependencies]
-gstd = { git = "https://github.com/gear-tech/gear.git", features = ["debug"] }
-codec = { package = "parity-scale-codec", version = "3", default-features = false, features = ["derive"] }
-primitive-types = { version = "0.11", default-features = false }
+gstd = { git = "https://github.com/gear-tech/gear.git" }
+codec = { package = "parity-scale-codec", version = "3", default-features = false }
 supply-chain-io = { path = "io" }
 nft-io = { git = "https://github.com/gear-dapps/non-fungible-token.git" }
 ft-io = { git = "https://github.com/gear-dapps/fungible-token.git" }
