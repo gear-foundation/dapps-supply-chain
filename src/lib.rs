@@ -397,7 +397,9 @@ pub async fn main() {
     let action = msg::load().expect("Unable to decode SupplyChainAction");
     let supply_chain = unsafe { SUPPLY_CHAIN.get_or_insert(Default::default()) };
     match action {
-        SupplyChainAction::Produce { name, description } => supply_chain.produce_item(name, description).await,
+        SupplyChainAction::Produce { name, description } => {
+            supply_chain.produce_item(name, description).await;
+        }
         SupplyChainAction::PutUpForSaleByProducer { item_id, price } => {
             supply_chain
                 .put_up_for_sale_by_producer(item_id, price)
