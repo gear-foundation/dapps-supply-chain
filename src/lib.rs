@@ -28,7 +28,7 @@ async fn transfer_tokens(ft_program_id: ActorId, from: ActorId, to: ActorId, amo
         FTAction::Transfer { from, to, amount },
         0,
     )
-    .unwrap()
+    .expect("Error in async message to FT contract")
     .await
     .expect("Unable to decode FTEvent");
 }
@@ -39,7 +39,7 @@ async fn transfer_nft(nft_program_id: ActorId, to: ActorId, token_id: ItemId) {
         NFTAction::Transfer { to, token_id },
         0,
     )
-    .unwrap()
+    .expect("Error in async message to NFT contract")
     .await
     .expect("Unable to decode NFTTransfer");
 }
