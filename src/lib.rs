@@ -74,7 +74,7 @@ async fn receive(ft_program_id: ActorId, seller: ActorId, item: &Item) {
 }
 
 fn reply(supply_chain_event: SupplyChainEvent) {
-    msg::reply(supply_chain_event, 0).unwrap();
+    msg::reply(supply_chain_event, 0).expect("Error in message reply");
 }
 
 #[derive(Default)]
@@ -122,7 +122,7 @@ impl SupplyChain {
             },
             0,
         )
-        .unwrap()
+        .expect("Error in sending Mint message to NFT contract")
         .await
         .expect("Unable to decode Vec<u8>");
 
