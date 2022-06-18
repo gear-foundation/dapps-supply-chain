@@ -23,7 +23,7 @@ fn get_mut_item(items: &mut BTreeMap<ItemId, Item>, id: ItemId) -> &mut Item {
 }
 
 async fn transfer_tokens(ft_program_id: ActorId, from: ActorId, to: ActorId, amount: u128) {
-    msg::send_and_wait_for_reply::<FTEvent, _>(
+    msg::send_for_reply_as::<_, FTEvent>(
         ft_program_id,
         FTAction::Transfer { from, to, amount },
         0,
@@ -34,7 +34,7 @@ async fn transfer_tokens(ft_program_id: ActorId, from: ActorId, to: ActorId, amo
 }
 
 async fn transfer_nft(nft_program_id: ActorId, to: ActorId, token_id: ItemId) {
-    msg::send_and_wait_for_reply::<NFTTransfer, _>(
+    msg::send_for_reply_as::<_, NFTTransfer>(
         nft_program_id,
         NFTAction::Transfer { to, token_id },
         0,
@@ -111,7 +111,7 @@ impl SupplyChain {
     async fn produce_item(&mut self, name: String, description: String) {
         self.check_producer();
 
-        let raw_reply: Vec<u8> = msg::send_and_wait_for_reply(
+        let raw_reply: Vec<u8> = msg::send_for_reply_as(
             self.nft_program_id,
             NFTAction::Mint {
                 token_metadata: TokenMetadata {

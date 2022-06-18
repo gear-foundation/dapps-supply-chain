@@ -28,7 +28,7 @@ pub enum SupplyChainAction {
     /// * `name`: an item's name.
     /// * `description`: an item's description.
     ///
-    /// On success returns [`SupplyChainEvent::Produced`].
+    /// On success, returns [`SupplyChainEvent::Produced`].
     Produce { name: String, description: String },
 
     /// Puts an item up for a sale to a distributor for a given price
@@ -45,7 +45,7 @@ pub enum SupplyChainAction {
     /// * `item_id`: an item's ID.
     /// * `price`: an item's price.
     ///
-    /// On success returns [`SupplyChainEvent::Success`].
+    /// On success, returns [`SupplyChainEvent::Success`].
     PutUpForSaleByProducer { item_id: ItemId, price: u128 },
 
     /// Purchases an item from a producer on behalf of a distributor.
@@ -65,7 +65,7 @@ pub enum SupplyChainAction {
     /// * `delivery_time`: a time in milliseconds for which a producer must deliver an item.
     /// A countdown starts after [`SupplyChainAction::ShipByProducer`] is executed.
     ///
-    /// On success returns [`SupplyChainEvent::Success`].
+    /// On success, returns [`SupplyChainEvent::Success`].
     PurchaseByDistributor { item_id: ItemId, delivery_time: u64 },
 
     /// Approves or not a purchase from a distributor on behalf of a producer.
@@ -84,7 +84,7 @@ pub enum SupplyChainAction {
     /// * `item_id`: an item's ID.
     /// * `approve`: yes ([`true`]) or no ([`false`]).
     ///
-    /// On success returns [`SupplyChainEvent::Success`].
+    /// On success, returns [`SupplyChainEvent::Success`].
     ApproveByProducer { item_id: ItemId, approve: bool },
 
     /// Starts shipping a purchased item to a distributor on behalf of a producer.
@@ -97,7 +97,7 @@ pub enum SupplyChainAction {
     /// and a producer of this item.
     /// * Item's [`ItemState`] must be [`PurchasedByDistributor`](ItemState::PurchasedByDistributor).
     ///
-    /// On success returns [`SupplyChainEvent::Success`].
+    /// On success, returns [`SupplyChainEvent::Success`].
     ShipByProducer(ItemId),
 
     /// Receives a shipped item from a producer on behalf of a distributor.
@@ -113,7 +113,7 @@ pub enum SupplyChainAction {
     /// and a distributor of this item.
     /// * Item's [`ItemState`] must be [`ShippedByProducer`](ItemState::ShippedByProducer).
     ///
-    /// On success returns [`SupplyChainEvent::Success`].
+    /// On success, returns [`SupplyChainEvent::Success`].
     ReceiveByDistributor(ItemId),
 
     /// Processes a received item from a producer on behalf of a distributor.
@@ -123,7 +123,7 @@ pub enum SupplyChainAction {
     /// and a distributor of this item.
     /// * Item's [`ItemState`] must be [`ReceivedByDistributor`](ItemState::ReceivedByDistributor).
     ///
-    /// On success returns [`SupplyChainEvent::Success`].
+    /// On success, returns [`SupplyChainEvent::Success`].
     ProcessByDistributor(ItemId),
 
     /// Packages a processed item on behalf of a distributor.
@@ -133,7 +133,7 @@ pub enum SupplyChainAction {
     /// and a distributor of this item.
     /// * Item's [`ItemState`] must be [`ProcessedByDistributor`](ItemState::ProcessedByDistributor).
     ///
-    /// On success returns [`SupplyChainEvent::Success`].
+    /// On success, returns [`SupplyChainEvent::Success`].
     PackageByDistributor(ItemId),
 
     /// Puts a packaged item up for a sale to a retailer
@@ -150,7 +150,7 @@ pub enum SupplyChainAction {
     /// * `item_id`: an item's ID.
     /// * `price`: an item's price.
     ///
-    /// On success returns [`SupplyChainEvent::Success`].
+    /// On success, returns [`SupplyChainEvent::Success`].
     PutUpForSaleByDistributor { item_id: ItemId, price: u128 },
 
     /// Purchases an item from a distributor on behalf of a retailer.
@@ -167,7 +167,7 @@ pub enum SupplyChainAction {
     /// * `delivery_time`: a time in milliseconds for which a distributor must deliver an item.
     /// A countdown starts after [`SupplyChainAction::ShipByDistributor`] is executed.
     ///
-    /// On success returns [`SupplyChainEvent::Success`].
+    /// On success, returns [`SupplyChainEvent::Success`].
     PurchaseByRetailer { item_id: ItemId, delivery_time: u64 },
 
     /// Approves or not a purchase from a retailer on behalf of a distributor.
@@ -186,7 +186,7 @@ pub enum SupplyChainAction {
     /// * `item_id`: an item's ID.
     /// * `approve`: yes ([`true`]) or no ([`false`]).
     ///
-    /// On success returns [`SupplyChainEvent::Success`].
+    /// On success, returns [`SupplyChainEvent::Success`].
     ApproveByDistributor { item_id: ItemId, approve: bool },
 
     /// Starts shipping a purchased item to a retailer on behalf of a distributor.
@@ -199,7 +199,7 @@ pub enum SupplyChainAction {
     /// and a distributor of this item.
     /// * Item's [`ItemState`] must be [`PurchasedByRetailer`](ItemState::PurchasedByRetailer).
     ///
-    /// On success returns [`SupplyChainEvent::Success`].
+    /// On success, returns [`SupplyChainEvent::Success`].
     ShipByDistributor(ItemId),
 
     /// Receives a shipped item from a distributor on behalf of a retailer.
@@ -215,7 +215,7 @@ pub enum SupplyChainAction {
     /// and a retailer of this item.
     /// * Item's [`ItemState`] must be [`ShippedByDistributor`](ItemState::ShippedByDistributor).
     ///
-    /// On success returns [`SupplyChainEvent::Success`].
+    /// On success, returns [`SupplyChainEvent::Success`].
     ReceiveByRetailer(ItemId),
 
     /// Puts a received item from a distributor up for a sale to a consumer
@@ -232,7 +232,7 @@ pub enum SupplyChainAction {
     /// * `item_id`: an item's ID.
     /// * `price`: an item's price.
     ///
-    /// On success returns [`SupplyChainEvent::Success`].
+    /// On success, returns [`SupplyChainEvent::Success`].
     PutUpForSaleByRetailer { item_id: ItemId, price: u128 },
 
     /// Purchases an item from a retailer.
@@ -244,7 +244,7 @@ pub enum SupplyChainAction {
     /// # Requirements
     /// * Item's [`ItemState`] must be [`ForSaleByRetailer`](ItemState::ForSaleByRetailer).
     ///
-    /// On success returns [`SupplyChainEvent::Success`].
+    /// On success, returns [`SupplyChainEvent::Success`].
     PurchaseByConsumer(ItemId),
 }
 
@@ -261,7 +261,7 @@ pub enum SupplyChainState {
     /// # Arguments
     /// * `item_id`: an item's ID.
     ///
-    /// On success returns [`SupplyChainStateReply::ItemInfo`].
+    /// On success, returns [`SupplyChainStateReply::ItemInfo`].
     GetItemInfo(ItemId),
 }
 
