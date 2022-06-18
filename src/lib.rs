@@ -28,7 +28,7 @@ async fn transfer_tokens(ft_program_id: ActorId, from: ActorId, to: ActorId, amo
         FTAction::Transfer { from, to, amount },
         0,
     )
-    .expect("Error in async message to FT contract")
+    .expect("Error during a sending FTAction::Transfer to a FT program")
     .await
     .expect("Unable to decode FTEvent");
 }
@@ -39,7 +39,7 @@ async fn transfer_nft(nft_program_id: ActorId, to: ActorId, token_id: ItemId) {
         NFTAction::Transfer { to, token_id },
         0,
     )
-    .expect("Error in async message to NFT contract")
+    .expect("Error during a sending NFTAction::Transfer to an NFT program")
     .await
     .expect("Unable to decode NFTTransfer");
 }
@@ -74,7 +74,7 @@ async fn receive(ft_program_id: ActorId, seller: ActorId, item: &Item) {
 }
 
 fn reply(supply_chain_event: SupplyChainEvent) {
-    msg::reply(supply_chain_event, 0).expect("Error in message reply");
+    msg::reply(supply_chain_event, 0).expect("Error during a replying with SupplyChainEvent");
 }
 
 #[derive(Default)]
@@ -122,7 +122,7 @@ impl SupplyChain {
             },
             0,
         )
-        .expect("Error in sending Mint message to NFT contract")
+        .expect("Error during a sending NFTAction::Mint to an NFT program")
         .await
         .expect("Unable to decode Vec<u8>");
 
