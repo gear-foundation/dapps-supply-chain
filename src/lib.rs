@@ -6,6 +6,8 @@ use gstd::{async_main, exec, msg, prelude::*, ActorId};
 use nft_io::NFTAction;
 use supply_chain_io::*;
 
+const ZERO_ID: ActorId = ActorId::new([0; 32]);
+
 #[derive(Default)]
 struct Item {
     info: ItemInfo,
@@ -16,6 +18,10 @@ fn panic_item_not_exist(item_id: ItemId) -> ! {
     panic!("Item with the {item_id} ID doesn't exist")
 }
 
+fn panic_zero_address_among_(who: &str) -> ! {
+    panic!("The zero address can't be among {who}")
+}
+
 fn get_mut_item(items: &mut BTreeMap<ItemId, Item>, id: ItemId) -> &mut Item {
     items
         .get_mut(&id)
@@ -23,14 +29,10 @@ fn get_mut_item(items: &mut BTreeMap<ItemId, Item>, id: ItemId) -> &mut Item {
 }
 
 async fn transfer_tokens(ft_program_id: ActorId, from: ActorId, to: ActorId, amount: u128) {
-    msg::send_for_reply_as::<_, FTEvent>(
-        ft_program_id,
-        FTAction::Transfer { from, to, amount },
-        0,
-    )
-    .expect("Error during a sending FTAction::Transfer to a FT program")
-    .await
-    .expect("Unable to decode FTEvent");
+    msg::send_for_reply_as::<_, FTEvent>(ft_program_id, FTAction::Transfer { from, to, amount }, 0)
+        .expect("Error during a sending FTAction::Transfer to a FT program")
+        .await
+        .expect("Unable to decode FTEvent");
 }
 
 async fn transfer_nft(nft_program_id: ActorId, to: ActorId, token_id: ItemId) {
@@ -379,6 +381,17 @@ pub extern "C" fn init() {
         ft_program_id,
         nft_program_id,
     } = msg::load().expect("Unable to decode InitSupplyChain");
+
+    if producers.contains(&ZERO_ID) {
+        panic_zero_address_among_("producers")
+    }
+    if distributors.contains(&ZERO_ID) {
+        panic_zero_address_among_("distributors")
+    }
+    if retailers.contains(&ZERO_ID) {
+        panic_zero_address_among_("retailers")
+    }
+
     let supply_chain = SupplyChain {
         producers,
         distributors,
