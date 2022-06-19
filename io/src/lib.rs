@@ -6,6 +6,9 @@ use primitive_types::U256;
 pub type ItemId = U256;
 
 /// Initializes a supply chain.
+///
+/// # Requirements
+/// * There mustn't be the zero address among `producers`, `distributors`, and `retailers` addresses.
 #[derive(Encode, Decode, TypeInfo)]
 pub struct InitSupplyChain {
     /// Producers addresses who'll have a right to interact with a supply chain.
