@@ -19,7 +19,7 @@ fn panic_item_not_exist(item_id: ItemId) -> ! {
 }
 
 fn panic_zero_address_among_(who: &str) -> ! {
-    panic!("The zero address can't be among {who}")
+    panic!("Zero address can't be among {who}")
 }
 
 fn get_mut_item(items: &mut BTreeMap<ItemId, Item>, id: ItemId) -> &mut Item {

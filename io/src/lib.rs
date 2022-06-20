@@ -306,12 +306,12 @@ pub enum SupplyChainState {
     ),
 }
 
-#[derive(Encode, Decode, TypeInfo)]
+#[derive(Encode, Decode, TypeInfo, Debug, PartialEq, Eq)]
 pub enum SupplyChainStateReply {
     ItemInfo(ItemInfo),
 }
 
-#[derive(Encode, Decode, Clone, TypeInfo, Default)]
+#[derive(Encode, Decode, Clone, TypeInfo, Default, Debug, PartialEq, Eq)]
 pub struct ItemInfo {
     /// An item's producer address.
     pub producer: ActorId,
