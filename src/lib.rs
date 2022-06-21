@@ -18,7 +18,7 @@ fn panic_item_not_exist(item_id: ItemId) -> ! {
     panic!("Item with the {item_id} ID doesn't exist")
 }
 
-fn panic_zero_address_among_(who: &str) -> ! {
+fn panic_zero_address_among(who: &str) -> ! {
     panic!("Zero address can't be among {who}")
 }
 
