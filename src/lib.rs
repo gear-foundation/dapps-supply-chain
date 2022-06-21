@@ -383,13 +383,13 @@ pub extern "C" fn init() {
     } = msg::load().expect("Unable to decode InitSupplyChain");
 
     if producers.contains(&ZERO_ID) {
-        panic_zero_address_among_("producers")
+        panic_zero_address_among("producers")
     }
     if distributors.contains(&ZERO_ID) {
-        panic_zero_address_among_("distributors")
+        panic_zero_address_among("distributors")
     }
     if retailers.contains(&ZERO_ID) {
-        panic_zero_address_among_("retailers")
+        panic_zero_address_among("retailers")
     }
 
     let supply_chain = SupplyChain {
