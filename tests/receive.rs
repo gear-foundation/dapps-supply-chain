@@ -7,7 +7,7 @@ fn delivery_wo_delay() {
 
     let ft_program = init_ft_program(&system);
     init_nft_program(&system);
-    let supply_chain_program = deploy_supply_chain_program(&system);
+    let supply_chain_program = Program::current(&system);
     check::init_supply_chain_program(&supply_chain_program);
 
     mint(&ft_program, DISTRIBUTOR[0], ITEM_PRICE_BY_PRODUCER[0]);
@@ -73,7 +73,7 @@ fn delivery_with_delay() {
 
     let ft_program = init_ft_program(&system);
     init_nft_program(&system);
-    let supply_chain_program = deploy_supply_chain_program(&system);
+    let supply_chain_program = Program::current(&system);
     check::init_supply_chain_program(&supply_chain_program);
 
     mint(&ft_program, DISTRIBUTOR[0], ITEM_PRICE_BY_PRODUCER[0]);
@@ -153,7 +153,7 @@ fn delivery_with_big_delay() {
 
     let ft_program = init_ft_program(&system);
     init_nft_program(&system);
-    let supply_chain_program = deploy_supply_chain_program(&system);
+    let supply_chain_program = Program::current(&system);
     check::init_supply_chain_program(&supply_chain_program);
 
     mint(&ft_program, DISTRIBUTOR[0], ITEM_PRICE_BY_PRODUCER[0]);

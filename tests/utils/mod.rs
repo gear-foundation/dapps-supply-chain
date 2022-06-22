@@ -5,7 +5,8 @@ use gear_lib::non_fungible_token::{
 };
 pub use gstd::prelude::*;
 use gstd::ActorId;
-use gtest::{Program, System};
+pub use gtest::Program;
+use gtest::System;
 use nft_io::InitNFT;
 pub use supply_chain_io::*;
 
@@ -71,13 +72,6 @@ pub fn init_nft_program(system: &System) -> Program {
         .is_empty());
 
     nft_program
-}
-
-pub fn deploy_supply_chain_program(system: &System) -> Program {
-    Program::from_file(
-        system,
-        "./target/wasm32-unknown-unknown/release/supply_chain.wasm",
-    )
 }
 
 pub fn mint(ft_program: &Program, actor: u64, amount: u128) {

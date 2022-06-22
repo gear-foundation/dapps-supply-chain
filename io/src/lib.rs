@@ -300,7 +300,7 @@ pub enum SupplyChainState {
     /// Gets [`ItemInfo`].
     ///
     /// On success, returns [`SupplyChainStateReply::ItemInfo`].
-    GetItemInfo(
+    ItemInfo(
         /// An item's ID.
         ItemId,
     ),

@@ -221,7 +221,7 @@ pub fn purchare_by_consumer(supply_chain_program: &Program, consumer: u64, item_
 pub fn get_item_info(supply_chain_program: &Program, item_id: u128, item_info: ItemInfo) {
     assert_eq!(
         supply_chain_program
-            .meta_state::<_, SupplyChainStateReply>(SupplyChainState::GetItemInfo(item_id.into())),
+            .meta_state::<_, SupplyChainStateReply>(SupplyChainState::ItemInfo(item_id.into())),
         SupplyChainStateReply::ItemInfo(item_info)
     );
 }

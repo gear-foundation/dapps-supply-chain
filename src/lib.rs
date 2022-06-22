@@ -477,7 +477,7 @@ pub extern "C" fn meta_state() -> *mut [i32; 2] {
     let state: SupplyChainState = msg::load().expect("Unable to decode SupplyChainState");
     let supply_chain = unsafe { SUPPLY_CHAIN.get_or_insert(Default::default()) };
     let encoded = match state {
-        SupplyChainState::GetItemInfo(item_id) => {
+        SupplyChainState::ItemInfo(item_id) => {
             SupplyChainStateReply::ItemInfo(supply_chain.get_item_info(item_id)).encode()
         }
     };

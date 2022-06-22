@@ -154,5 +154,5 @@ pub fn purchare_by_consumer(supply_chain_program: &Program, user: u64, item_id: 
 }
 
 pub fn get_item_info(supply_chain_program: &Program, item_id: u128) {
-    supply_chain_program.meta_state(SupplyChainState::GetItemInfo(item_id.into()))
+    supply_chain_program.meta_state(SupplyChainState::ItemInfo(item_id.into()))
 }

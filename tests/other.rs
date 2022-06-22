@@ -4,7 +4,7 @@ use utils::*;
 #[test]
 fn interact_with_unexistend_item() {
     let system = init_system();
-    let supply_chain_program = deploy_supply_chain_program(&system);
+    let supply_chain_program = Program::current(&system);
     check::init_supply_chain_program(&supply_chain_program);
 
     fail::put_up_for_sale_by_producer(&supply_chain_program, PRODUCER[0], NONEXISTEND_ITEM);
@@ -27,7 +27,7 @@ fn interact_with_unexistend_item() {
 #[should_panic]
 fn interact_with_unexistend_item_meta_state() {
     let system = init_system();
-    let supply_chain_program = deploy_supply_chain_program(&system);
+    let supply_chain_program = Program::current(&system);
     check::init_supply_chain_program(&supply_chain_program);
 
     fail::get_item_info(&supply_chain_program, NONEXISTEND_ITEM);
@@ -36,7 +36,7 @@ fn interact_with_unexistend_item_meta_state() {
 #[test]
 fn init_with_zero_address() {
     let system = init_system();
-    let supply_chain_program = deploy_supply_chain_program(&system);
+    let supply_chain_program = Program::current(&system);
     check::init_supply_chain_program(&supply_chain_program);
 
     fail::init_supply_chain_program(
