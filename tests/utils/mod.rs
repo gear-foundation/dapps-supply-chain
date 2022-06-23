@@ -94,10 +94,12 @@ pub fn check_nft_owner(nft_program: &Program, nft: u128, actor: u64) {
             token: Token { owner_id, .. },
         } => {
             if owner_id != actor {
-                panic!("Owner assertion failed.\n\
-                        NFT ID: {nft}\n\
-                        Given address: {actor:?}\n\
-                        Owner address: {owner_id:?}");
+                panic!(
+                    "Owner assertion failed.\n\
+                     NFT ID: {nft}\n\
+                     Given address: {actor:?}\n\
+                     Owner address: {owner_id:?}"
+                );
             }
         }
         _ => {
@@ -123,12 +125,14 @@ pub fn check_nft_name_n_description(
                 },
         } => {
             if name != true_name || description != true_description {
-                panic!("Name & description assertion failed.\n\
-                        NFT ID: {nft}\n\
-                        Given name: {name:?}\n\
-                        Given description: {description:?}\n\
-                        True name: {true_name:?}\n\
-                        True description: {true_description:?}")
+                panic!(
+                    "Name & description assertion failed.\n\
+                     NFT ID: {nft}\n\
+                     Given name: {name:?}\n\
+                     Given description: {description:?}\n\
+                     True name: {true_name:?}\n\
+                     True description: {true_description:?}"
+                )
             }
         }
         _ => {
