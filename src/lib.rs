@@ -373,7 +373,7 @@ impl SupplyChain {
 static mut SUPPLY_CHAIN: Option<SupplyChain> = None;
 
 #[no_mangle]
-pub extern "C" fn init() {
+extern "C" fn init() {
     let InitSupplyChain {
         producers,
         distributors,
@@ -406,7 +406,7 @@ pub extern "C" fn init() {
 }
 
 #[async_main]
-pub async fn main() {
+async fn main() {
     let action = msg::load().expect("Unable to decode SupplyChainAction");
     let supply_chain = unsafe { SUPPLY_CHAIN.get_or_insert(Default::default()) };
     match action {
@@ -473,7 +473,7 @@ pub async fn main() {
 }
 
 #[no_mangle]
-pub extern "C" fn meta_state() -> *mut [i32; 2] {
+extern "C" fn meta_state() -> *mut [i32; 2] {
     let state: SupplyChainState = msg::load().expect("Unable to decode SupplyChainState");
     let supply_chain = unsafe { SUPPLY_CHAIN.get_or_insert(Default::default()) };
     let encoded = match state {
