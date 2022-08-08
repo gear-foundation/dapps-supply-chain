@@ -259,6 +259,10 @@ impl<'a> SupplyChainInit<'a> {
 pub struct SupplyChainMetaState<'a>(&'a InnerProgram<'a>);
 
 impl SupplyChainMetaState<'_> {
+    pub fn item_price(self, item_id: u128) -> MetaStateReply<u128> {
+        MetaStateReply(self.item_info(item_id).0.price)
+    }
+
     pub fn item_info(self, item_id: u128) -> MetaStateReply<ItemInfo> {
         if let SupplyChainStateReply::ItemInfo(reply) = self
             .0
