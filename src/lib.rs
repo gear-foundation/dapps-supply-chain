@@ -400,8 +400,7 @@ async fn main() {
 
 #[no_mangle]
 extern "C" fn meta_state() -> *mut [i32; 2] {
-    let query: SupplyChainStateQuery =
-        msg::load().expect("Unable to decode `SupplyChainStateQuery`");
+    let query = msg::load().expect("Unable to decode `SupplyChainStateQuery`");
     let program = unsafe { PROGRAM.get_or_insert(Default::default()) };
     let encoded = match query {
         SupplyChainStateQuery::ItemInfo(item_id) => {
