@@ -1,6 +1,7 @@
 pub mod utils;
 use utils::{prelude::*, FungibleToken, NonFungibleToken};
 
+// Pairs of participants are needed here to test ownership of items.
 const PRODUCER: [u64; 2] = [5, 6];
 const DISTRIBUTOR: [u64; 2] = [7, 8];
 const RETAILER: [u64; 2] = [9, 10];
