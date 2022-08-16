@@ -397,25 +397,35 @@ pub enum SupplyChainEvent {
 /// On failure, returns a [`Default`] value.
 #[derive(Encode, Decode, TypeInfo)]
 pub enum SupplyChainStateQuery {
-    /// Gets [`ItemInfo`].
+    /// Queries [`ItemInfo`].
     ///
     /// Returns [`SupplyChainStateReply::ItemInfo`].
     ItemInfo(ItemId),
 
-    /// Gets supply chain [`Participants`].
+    /// Queries supply chain [`Participants`].
     ///
     /// Returns [`SupplyChainStateReply::Participants`].
     Participants,
 
-    /// Gets an FT program address used by a supply chain.
+    /// Queries an FT program address used by a supply chain.
     ///
     /// Returns [`SupplyChainStateReply::FTProgram`].
     FTProgram,
 
-    /// Gets an NFT program address used by a supply chain.
+    /// Queries an NFT program address used by a supply chain.
     ///
     /// Returns [`SupplyChainStateReply::NFTProgram`].
     NFTProgram,
+
+    /// Queries [`ItemId`] & [`ItemInfo`] of all items that exist in a supply chain.
+    ///
+    /// Returns [`SupplyChainStateReply::ExistingItems`].
+    ExistingItems,
+
+    /// Queries roles of the given address.
+    ///
+    /// Returns [`SupplyChainStateReply::Roles`].
+    Roles(ActorId),
 }
 
 /// A reply for queried [`SupplyChainStateQuery`].
@@ -429,12 +439,24 @@ pub enum SupplyChainStateReply {
     Participants(Participants),
     /// Should be returned from [`SupplyChainStateQuery::NFTProgram`].
     NFTProgram(ActorId),
+    /// Should be returned from [`SupplyChainStateQuery::ExistingItems`].
+    ExistingItems(BTreeMap<ItemId, ItemInfo>),
+    /// Should be returned from [`SupplyChainStateQuery::Roles`].
+    Roles(BTreeSet<Role>),
+}
+
+#[derive(Encode, Decode, TypeInfo, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub enum Role {
+    Producer,
+    Distributor,
+    Retailer,
+    Consumer,
 }
 
 /// Item info.
 ///
 /// Can be queried by [`SupplyChainStateQuery::ItemInfo`].
-#[derive(Encode, Decode, Clone, TypeInfo, Default, Debug, PartialEq, Eq)]
+#[derive(Encode, Decode, Clone, TypeInfo, Default, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ItemInfo {
     /// An item's producer address.
     pub producer: ActorId,
@@ -456,7 +478,7 @@ pub struct ItemInfo {
 }
 
 /// An item's state.
-#[derive(Encode, Decode, PartialEq, Eq, Clone, Copy, Debug, TypeInfo, Default)]
+#[derive(Encode, Decode, PartialEq, Eq, Clone, Copy, Debug, TypeInfo, Default, PartialOrd, Ord)]
 pub enum ItemState {
     #[default]
     Produced,

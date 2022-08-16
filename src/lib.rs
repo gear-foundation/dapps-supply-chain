@@ -417,6 +417,28 @@ extern "C" fn meta_state() -> *mut [i32; 2] {
         }),
         SupplyChainStateQuery::FTProgram => SupplyChainStateReply::FTProgram(program.ft_program),
         SupplyChainStateQuery::NFTProgram => SupplyChainStateReply::NFTProgram(program.nft_program),
+        SupplyChainStateQuery::ExistingItems => SupplyChainStateReply::ExistingItems(
+            program
+                .items
+                .iter()
+                .map(|item| (*item.0, item.1.info.clone()))
+                .collect(),
+        ),
+        SupplyChainStateQuery::Roles(address) => {
+            let mut roles = BTreeSet::from([Role::Consumer]);
+
+            if program.producers.contains(&address) {
+                roles.insert(Role::Producer);
+            }
+            if program.distributors.contains(&address) {
+                roles.insert(Role::Distributor);
+            }
+            if program.retailers.contains(&address) {
+                roles.insert(Role::Retailer);
+            }
+
+            SupplyChainStateReply::Roles(roles)
+        }
     }
     .encode();
     gstd::util::to_leak_ptr(encoded)
