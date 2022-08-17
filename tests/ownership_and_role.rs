@@ -212,7 +212,7 @@ fn query_roles() {
     schain_program
         .meta_state()
         .roles(FOREIGN_USER)
-        .check(Roles::all());
+        .check([Role::Producer, Role::Distributor, Role::Retailer].into());
 
     schain_program = SupplyChain::initialize_custom(
         &system,
@@ -229,5 +229,5 @@ fn query_roles() {
     schain_program
         .meta_state()
         .roles(FOREIGN_USER)
-        .check(Roles::CONSUMER);
+        .check([].into());
 }

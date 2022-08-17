@@ -425,16 +425,16 @@ extern "C" fn meta_state() -> *mut [i32; 2] {
                 .collect(),
         ),
         SupplyChainStateQuery::Roles(actor_id) => {
-            let mut roles = Roles::CONSUMER;
+            let mut roles = BTreeSet::new();
 
             if program.producers.contains(&actor_id) {
-                roles.insert(Roles::PRODUCER)
+                roles.insert(Role::Producer);
             }
             if program.distributors.contains(&actor_id) {
-                roles.insert(Roles::DISTRIBUTOR)
+                roles.insert(Role::Distributor);
             }
             if program.retailers.contains(&actor_id) {
-                roles.insert(Roles::RETAILER)
+                roles.insert(Role::Retailer);
             }
 
             SupplyChainStateReply::Roles(roles)

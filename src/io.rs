@@ -422,11 +422,7 @@ pub enum SupplyChainStateQuery {
     /// Returns [`SupplyChainStateReply::ExistingItems`].
     ExistingItems,
 
-    /// Queries [`Roles`] of given [`ActorId`].
-    ///
-    /// If given [`ActorId`] doesn't have any participant role
-    /// ([`PRODUCER`](Roles::PRODUCER)/[`DISTRIBUTOR`](Roles::DISTRIBUTOR)/
-    /// [`RETAILER`](Roles::RETAILER)), returns only [`Roles::CONSUMER`].
+    /// Queries [`Role`]s of given [`ActorId`].
     ///
     /// Returns [`SupplyChainStateReply::Roles`].
     Roles(ActorId),
@@ -446,23 +442,17 @@ pub enum SupplyChainStateReply {
     /// Should be returned from [`SupplyChainStateQuery::ExistingItems`].
     ExistingItems(BTreeMap<ItemId, ItemInfo>),
     /// Should be returned from [`SupplyChainStateQuery::Roles`].
-    Roles(Roles),
+    Roles(BTreeSet<Role>),
 }
 
-bitflags::bitflags! {
-    /// Roles for interacting with a supply chain.
-    ///
-    /// For the descriptions of the first 3, see the documentation of
-    /// [`Participants`].
-    ///
-    /// Can be queried by [`SupplyChainStateQuery::Roles`].
-    #[derive(Encode, Decode, TypeInfo)]
-    pub struct Roles: u8 {
-        const PRODUCER = 0b00000001;
-        const DISTRIBUTOR = 0b00000010;
-        const RETAILER = 0b00000100;
-        const CONSUMER = 0b00001000;
-    }
+/// Roles of supply chain [`Participants`].
+///
+/// Can be queried by [`SupplyChainStateQuery::Roles`].
+#[derive(Encode, Decode, TypeInfo, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub enum Role {
+    Producer,
+    Distributor,
+    Retailer,
 }
 
 /// Item info.
