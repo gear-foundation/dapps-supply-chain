@@ -333,9 +333,9 @@ extern "C" fn init() {
 
     if [&producers, &distributors, &retailers]
         .iter()
-        .any(|addresses| addresses.contains(&ActorId::zero()))
+        .any(|actor_ids| actor_ids.contains(&ActorId::zero()))
     {
-        panic!("Each address of `producers`, `distributors`, and `retailers` mustn't equal `ActorId::zero()`");
+        panic!("Each `ActorId` of `producers`, `distributors`, and `retailers` mustn't equal `ActorId::zero()`");
     }
 
     let supply_chain = SupplyChain {
@@ -405,7 +405,7 @@ extern "C" fn meta_state() -> *mut [i32; 2] {
     let encoded = match query {
         SupplyChainStateQuery::ItemInfo(item_id) => {
             SupplyChainStateReply::ItemInfo(if let Some(item) = program.items.get(&item_id) {
-                item.info.clone()
+                item.info
             } else {
                 Default::default()
             })
@@ -421,20 +421,20 @@ extern "C" fn meta_state() -> *mut [i32; 2] {
             program
                 .items
                 .iter()
-                .map(|item| (*item.0, item.1.info.clone()))
+                .map(|item| (*item.0, item.1.info))
                 .collect(),
         ),
-        SupplyChainStateQuery::Roles(address) => {
-            let mut roles = BTreeSet::from([Role::Consumer]);
+        SupplyChainStateQuery::Roles(actor_id) => {
+            let mut roles = Roles::CONSUMER;
 
-            if program.producers.contains(&address) {
-                roles.insert(Role::Producer);
+            if program.producers.contains(&actor_id) {
+                roles.insert(Roles::PRODUCER)
             }
-            if program.distributors.contains(&address) {
-                roles.insert(Role::Distributor);
+            if program.distributors.contains(&actor_id) {
+                roles.insert(Roles::DISTRIBUTOR)
             }
-            if program.retailers.contains(&address) {
-                roles.insert(Role::Retailer);
+            if program.retailers.contains(&actor_id) {
+                roles.insert(Roles::RETAILER)
             }
 
             SupplyChainStateReply::Roles(roles)
