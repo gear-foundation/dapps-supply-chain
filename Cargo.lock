@@ -497,7 +497,7 @@ dependencies = [
 [[package]]
 name = "galloc"
 version = "0.1.0"
-source = "git+https://github.com/gear-tech/gear.git#0ff42a84a4a83ef03b01d8ad2ae6c151cb6f1d3b"
+source = "git+https://github.com/gear-tech/gear.git#a3ff02efad762656743c450935d2ea6a875b81f7"
 dependencies = [
  "dlmalloc",
 ]
@@ -505,7 +505,7 @@ dependencies = [
 [[package]]
 name = "gcore"
 version = "0.1.0"
-source = "git+https://github.com/gear-tech/gear.git#0ff42a84a4a83ef03b01d8ad2ae6c151cb6f1d3b"
+source = "git+https://github.com/gear-tech/gear.git#a3ff02efad762656743c450935d2ea6a875b81f7"
 dependencies = [
  "gear-core-errors",
  "parity-scale-codec",
@@ -560,7 +560,7 @@ dependencies = [
 [[package]]
 name = "gear-core-errors"
 version = "0.1.0"
-source = "git+https://github.com/gear-tech/gear.git#0ff42a84a4a83ef03b01d8ad2ae6c151cb6f1d3b"
+source = "git+https://github.com/gear-tech/gear.git#a3ff02efad762656743c450935d2ea6a875b81f7"
 dependencies = [
  "derive_more",
  "parity-scale-codec",
@@ -585,8 +585,20 @@ dependencies = [
 
 [[package]]
 name = "gear-lib"
-version = "0.1.0"
-source = "git+https://github.com/gear-dapps/gear-lib.git#f76f0e037bc332d17ed88bf230c6ea7611857665"
+version = "0.2.0"
+source = "git+https://github.com/gear-dapps/gear-lib.git?tag=0.2.0#de4f599779809c8167ed6ead505ed665da6bcba4"
+dependencies = [
+ "gstd",
+ "parity-scale-codec",
+ "primitive-types",
+ "scale-info",
+ "sp-core",
+]
+
+[[package]]
+name = "gear-lib"
+version = "0.2.0"
+source = "git+https://github.com/gear-dapps/gear-lib.git#de4f599779809c8167ed6ead505ed665da6bcba4"
 dependencies = [
  "gstd",
  "parity-scale-codec",
@@ -633,7 +645,7 @@ dependencies = [
 [[package]]
 name = "gstd"
 version = "0.1.0"
-source = "git+https://github.com/gear-tech/gear.git#0ff42a84a4a83ef03b01d8ad2ae6c151cb6f1d3b"
+source = "git+https://github.com/gear-tech/gear.git#a3ff02efad762656743c450935d2ea6a875b81f7"
 dependencies = [
  "bs58",
  "futures",
@@ -650,7 +662,7 @@ dependencies = [
 [[package]]
 name = "gstd-codegen"
 version = "0.1.0"
-source = "git+https://github.com/gear-tech/gear.git#0ff42a84a4a83ef03b01d8ad2ae6c151cb6f1d3b"
+source = "git+https://github.com/gear-tech/gear.git#a3ff02efad762656743c450935d2ea6a875b81f7"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -854,9 +866,9 @@ dependencies = [
 [[package]]
 name = "nft-io"
 version = "0.1.0"
-source = "git+https://github.com/gear-dapps/non-fungible-token.git?tag=0.1.0#213739608d699711a8fb90e44bf7769a09bf715b"
+source = "git+https://github.com/gear-dapps/non-fungible-token.git?tag=0.2.0#22bd6cc992bb34186a5bda4af7fcc376936551b6"
 dependencies = [
- "gear-lib",
+ "gear-lib 0.2.0 (git+https://github.com/gear-dapps/gear-lib.git?tag=0.2.0)",
  "gstd",
  "parity-scale-codec",
  "primitive-types",
@@ -1521,7 +1533,7 @@ name = "supply-chain"
 version = "0.1.0"
 dependencies = [
  "ft-io",
- "gear-lib",
+ "gear-lib 0.2.0 (git+https://github.com/gear-dapps/gear-lib.git)",
  "gear-wasm-builder",
  "gstd",
  "gtest",
