@@ -2,7 +2,7 @@ use super::{Program, RunResult, TransactionProgram, FOREIGN_USER};
 use ft_logic_io::Action;
 use ft_main_io::{FTokenAction, FTokenEvent, InitFToken};
 use gstd::{prelude::*, ActorId};
-use gtest::{Program as InnerProgram, System};
+use gtest::{Log, Program as InnerProgram, RunResult as InnerRunResult, System};
 
 type SFTRunResult<T> = RunResult<T, FTokenEvent>;
 
@@ -39,10 +39,10 @@ impl<'a> Sft<'a> {
         Self(program, 0)
     }
 
-    pub fn mint(&mut self, recipient: u64, amount: u128) -> SFTRunResult<bool> {
+    pub fn mint(&mut self, recipient: u64, amount: u128) {
         let transaction_id = self.transaction_id();
 
-        RunResult(
+        assert_ft_token_event_ok(
             self.0.send(
                 FOREIGN_USER,
                 FTokenAction::Message {
@@ -54,19 +54,13 @@ impl<'a> Sft<'a> {
                     .encode(),
                 },
             ),
-            bool_to_event,
-        )
+        );
     }
 
-    pub fn approve(
-        &mut self,
-        from: u64,
-        approved_account: impl Into<ActorId>,
-        amount: u128,
-    ) -> SFTRunResult<bool> {
+    pub fn approve(&mut self, from: u64, approved_account: impl Into<ActorId>, amount: u128) {
         let transaction_id = self.transaction_id();
 
-        RunResult(
+        assert_ft_token_event_ok(
             self.0.send(
                 from,
                 FTokenAction::Message {
@@ -78,8 +72,7 @@ impl<'a> Sft<'a> {
                     .encode(),
                 },
             ),
-            bool_to_event,
-        )
+        );
     }
 
     pub fn balance(&self, actor_id: impl Into<ActorId>) -> SFTRunResult<u128> {
@@ -91,8 +84,6 @@ impl<'a> Sft<'a> {
     }
 }
 
-fn bool_to_event(is_ok: bool) -> FTokenEvent {
-    const EVENTS: [FTokenEvent; 2] = [FTokenEvent::Err, FTokenEvent::Ok];
-
-    EVENTS[is_ok as usize]
+fn assert_ft_token_event_ok(is_ok: InnerRunResult) {
+    assert!(is_ok.contains(&Log::builder().payload(FTokenEvent::Ok)))
 }

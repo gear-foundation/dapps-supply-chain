@@ -12,16 +12,11 @@ fn delivery_wo_delay() {
 
     let nft = NonFungibleToken::initialize(&system);
     let mut sft = Sft::initialize(&system);
-
-    for from in [DISTRIBUTOR, RETAILER] {
-        sft.mint(from, ITEM_PRICE).contains(true);
-    }
-
     let supply_chain = SupplyChain::initialize(&system, sft.actor_id(), nft.actor_id());
 
     for from in [DISTRIBUTOR, RETAILER] {
-        sft.approve(from, supply_chain.actor_id(), ITEM_PRICE)
-            .contains(true);
+        sft.mint(from, ITEM_PRICE);
+        sft.approve(from, supply_chain.actor_id(), ITEM_PRICE);
     }
 
     supply_chain.produce(PRODUCER).contains(0);
@@ -76,16 +71,11 @@ fn delivery_with_delay() {
 
     let nft = NonFungibleToken::initialize(&system);
     let mut sft = Sft::initialize(&system);
-
-    for (from, amount) in [(DISTRIBUTOR, ITEM_PRICE[0]), (RETAILER, ITEM_PRICE[1])] {
-        sft.mint(from, amount).contains(true);
-    }
-
     let supply_chain = SupplyChain::initialize(&system, sft.actor_id(), nft.actor_id());
 
     for (from, amount) in [(DISTRIBUTOR, ITEM_PRICE[0]), (RETAILER, ITEM_PRICE[1])] {
-        sft.approve(from, supply_chain.actor_id(), amount)
-            .contains(true);
+        sft.mint(from, amount);
+        sft.approve(from, supply_chain.actor_id(), amount);
     }
 
     supply_chain.produce(PRODUCER).contains(0);
@@ -144,15 +134,11 @@ fn delivery_with_big_delay() {
     let nft = NonFungibleToken::initialize(&system);
     let mut sft = Sft::initialize(&system);
 
-    for from in [DISTRIBUTOR, RETAILER] {
-        sft.mint(from, ITEM_PRICE).contains(true);
-    }
-
     let supply_chain = SupplyChain::initialize(&system, sft.actor_id(), nft.actor_id());
 
     for from in [DISTRIBUTOR, RETAILER] {
-        sft.approve(from, supply_chain.actor_id(), ITEM_PRICE)
-            .contains(true);
+        sft.mint(from, ITEM_PRICE);
+        sft.approve(from, supply_chain.actor_id(), ITEM_PRICE);
     }
 
     supply_chain.produce(PRODUCER).contains(0);

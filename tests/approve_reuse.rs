@@ -11,22 +11,14 @@ fn approve_reuse_and_ft_transfer() {
 
     let nft = NonFungibleToken::initialize(&system);
     let mut sft = Sft::initialize(&system);
+    let supply_chain = SupplyChain::initialize(&system, sft.actor_id(), nft.actor_id());
 
     for (from, amount) in [
         (DISTRIBUTOR, ITEM_PRICE_BY_PRODUCER),
         (RETAILER, ITEM_PRICE_BY_DISTRIBUTOR),
     ] {
-        sft.mint(from, amount).contains(true);
-    }
-
-    let supply_chain = SupplyChain::initialize(&system, sft.actor_id(), nft.actor_id());
-
-    for (from, amount) in [
-        (DISTRIBUTOR, ITEM_PRICE_BY_PRODUCER * 2),
-        (RETAILER, ITEM_PRICE_BY_DISTRIBUTOR * 2),
-    ] {
-        sft.approve(from, supply_chain.actor_id(), amount)
-            .contains(true);
+        sft.mint(from, amount);
+        sft.approve(from, supply_chain.actor_id(), amount * 2);
     }
 
     supply_chain.produce(PRODUCER).contains(0);

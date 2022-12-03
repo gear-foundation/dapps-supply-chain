@@ -15,7 +15,7 @@ fn ownership_and_role() {
     let mut sft = Sft::initialize(&system);
 
     for from in [DISTRIBUTOR[0], RETAILER[0]] {
-        sft.mint(from, ITEM_PRICE).contains(true);
+        sft.mint(from, ITEM_PRICE);
     }
 
     let supply_chain = SupplyChain::initialize_custom(
@@ -32,8 +32,7 @@ fn ownership_and_role() {
     .succeed();
 
     for from in [DISTRIBUTOR[0], RETAILER[0]] {
-        sft.approve(from, supply_chain.actor_id(), ITEM_PRICE)
-            .contains(true);
+        sft.approve(from, supply_chain.actor_id(), ITEM_PRICE);
     }
 
     // Should fail because `msg::source()` must be a producer.

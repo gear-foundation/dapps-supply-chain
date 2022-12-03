@@ -8,16 +8,11 @@ fn nft_transfer() {
 
     let nft = NonFungibleToken::initialize(&system);
     let mut sft = Sft::initialize(&system);
-
-    for from in [DISTRIBUTOR, RETAILER, CONSUMER] {
-        sft.mint(from, ITEM_PRICE).contains(true);
-    }
-
     let supply_chain = SupplyChain::initialize(&system, sft.actor_id(), nft.actor_id());
 
     for from in [DISTRIBUTOR, RETAILER, CONSUMER] {
-        sft.approve(from, supply_chain.actor_id(), ITEM_PRICE)
-            .contains(true);
+        sft.mint(from, ITEM_PRICE);
+        sft.approve(from, supply_chain.actor_id(), ITEM_PRICE);
     }
 
     supply_chain.produce(PRODUCER).contains(0);

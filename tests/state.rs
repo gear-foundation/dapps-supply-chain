@@ -8,17 +8,12 @@ fn state() {
 
     let nft = NonFungibleToken::initialize(&system);
     let mut sft = Sft::initialize(&system);
-
-    for from in [DISTRIBUTOR, RETAILER, CONSUMER] {
-        // Double the balances to catch bugs.
-        sft.mint(from, ITEM_PRICE * 2).contains(true);
-    }
-
     let supply_chain = SupplyChain::initialize(&system, sft.actor_id(), nft.actor_id());
 
     for from in [DISTRIBUTOR, RETAILER, CONSUMER] {
-        sft.approve(from, supply_chain.actor_id(), ITEM_PRICE * 2)
-            .contains(true);
+        // Double the balances to catch bugs.
+        sft.mint(from, ITEM_PRICE * 2);
+        sft.approve(from, supply_chain.actor_id(), ITEM_PRICE * 2);
     }
 
     supply_chain.produce(PRODUCER).contains(0);
