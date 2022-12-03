@@ -30,16 +30,26 @@ linter:
 
 pre-commit: fmt linter test
 
-test: build
-	@if [ ! -f "./target/fungible_token-0.1.0.wasm" ]; then\
+test:
+	@if [ ! -f "./target/ft_main.opt.wasm" ]; then\
 	    curl -L\
-	        "https://github.com/gear-dapps/fungible-token/releases/download/0.1.0/fungible_token-0.1.0.wasm"\
-	        -o "./target/fungible_token-0.1.0.wasm";\
+	        "https://github.com/gear-dapps/sharded-fungible-token/releases/download/0.1.3/ft_main-0.1.3.opt.wasm"\
+	        -o "./target/ft_main.opt.wasm";\
 	fi
-	@if [ ! -f "./target/nft-0.1.0.wasm" ]; then\
+	@if [ ! -f "./target/ft_logic.opt.wasm" ]; then\
 	    curl -L\
-	        "https://github.com/gear-dapps/non-fungible-token/releases/download/0.1.0/nft-0.1.0.wasm"\
-	        -o "./target/nft-0.1.0.wasm";\
+	        "https://github.com/gear-dapps/sharded-fungible-token/releases/download/0.1.3/ft_logic-0.1.3.opt.wasm"\
+	        -o "./target/ft_logic.opt.wasm";\
+	fi
+	@if [ ! -f "./target/ft_storage.opt.wasm" ]; then\
+	    curl -L\
+	        "https://github.com/gear-dapps/sharded-fungible-token/releases/download/0.1.3/ft_storage-0.1.3.opt.wasm"\
+	        -o "./target/ft_storage.opt.wasm";\
+	fi
+	@if [ ! -f "./target/nft.wasm" ]; then\
+	    curl -L\
+	        "https://github.com/gear-dapps/non-fungible-token/releases/download/0.2.5/nft-0.2.5.wasm"\
+	        -o "./target/nft.wasm";\
 	fi
 	@echo ──────────── Run tests ────────────────────────
-	@cargo +nightly test --release
+	@cargo +nightly t

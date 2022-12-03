@@ -1,48 +1,103 @@
 #![no_std]
 
 use gear_lib::non_fungible_token::token::TokenMetadata;
-use gstd::{async_main, exec, msg, prelude::*, ActorId};
-
-mod utils;
+use gstd::{async_main, exec, msg, prelude::*, util, ActorId};
 
 mod io;
+mod utils;
+
 pub use io::*;
 
-#[derive(Default)]
+fn get_mut_item(
+    items: &mut BTreeMap<ItemId, Item>,
+    item_id: ItemId,
+    expected_item_state: ItemState,
+) -> &mut Item {
+    let item = items
+        .get_mut(&item_id)
+        .unwrap_or_else(|| panic!("Item must exist in a supply chain"));
+
+    assert_eq!(item.info.state, expected_item_state);
+
+    item
+}
+
+fn role_to_set_item_dr(role: Role) -> fn(&mut Item, ActorId) {
+    const FNS: [fn(&mut Item, ActorId); 2] = [Item::set_distributor, Item::set_retailer];
+
+    FNS[role as usize - 1]
+}
+
+fn role_to_assert_pdr(role: Role) -> fn(&Item, ActorId) {
+    const FNS: [fn(&Item, ActorId); 3] = [
+        Item::assert_producer,
+        Item::assert_distributor,
+        Item::assert_retailer,
+    ];
+
+    FNS[role as usize]
+}
+
+fn role_to_get_item_pdr(role: Role) -> fn(&Item) -> ActorId {
+    const FNS: [fn(&Item) -> ActorId; 3] = [
+        Item::get_producer,
+        Item::get_distributor,
+        Item::get_retailer,
+    ];
+
+    FNS[role as usize]
+}
+
 struct Item {
     info: ItemInfo,
     shipping_time: u64,
 }
 
-fn get_mut_item(items: &mut BTreeMap<ItemId, Item>, id: ItemId) -> &mut Item {
-    items
-        .get_mut(&id)
-        .unwrap_or_else(|| panic!("Item not found by an ID"))
-}
+impl Item {
+    fn set_retailer(&mut self, retailer: ActorId) {
+        self.info.retailer = retailer
+    }
 
-async fn receive(ft_program: ActorId, msg_source: ActorId, seller: ActorId, item: &Item) {
-    let program_id = exec::program_id();
-    let elapsed_time = exec::block_timestamp() - item.shipping_time;
-    // By default, all fungible tokens are transferred to a seller,
-    let (mut to, mut amount) = (seller, item.info.price);
+    fn set_distributor(&mut self, distributor: ActorId) {
+        self.info.distributor = distributor
+    }
 
-    // but if the seller spends more time than was agreed...
-    if elapsed_time > item.info.delivery_time {
-        // ...and is extremely late (more than or exactly 2 times in this example),
-        if elapsed_time >= item.info.delivery_time * 2 {
-            // then all fungible tokens are refunded to a buyer...
-            to = msg_source;
-        } else {
-            // ...or another half is transferred to a seller...
-            amount /= 2;
+    fn set_state_and_get_event(
+        &mut self,
+        item_id: ItemId,
+        item_state: ItemState,
+    ) -> SupplyChainEvent {
+        self.info.state = item_state;
 
-            // ...and a half of tokens is refunded to a buyer.
-            utils::transfer_ftokens(ft_program, program_id, msg_source, item.info.price - amount)
-                .await;
+        SupplyChainEvent {
+            item_id,
+            item_state,
         }
     }
 
-    utils::transfer_ftokens(ft_program, program_id, to, amount).await;
+    fn assert_producer(&self, actor_id: ActorId) {
+        assert_eq!(self.info.producer, actor_id)
+    }
+
+    fn assert_distributor(&self, actor_id: ActorId) {
+        assert_eq!(self.info.distributor, actor_id)
+    }
+
+    fn assert_retailer(&self, actor_id: ActorId) {
+        assert_eq!(self.info.retailer, actor_id)
+    }
+
+    fn get_producer(&self) -> ActorId {
+        self.info.producer
+    }
+
+    fn get_retailer(&self) -> ActorId {
+        self.info.retailer
+    }
+
+    fn get_distributor(&self) -> ActorId {
+        self.info.distributor
+    }
 }
 
 #[derive(Default)]
@@ -53,283 +108,339 @@ struct SupplyChain {
     distributors: BTreeSet<ActorId>,
     retailers: BTreeSet<ActorId>,
 
-    ft_program: ActorId,
-    nft_program: ActorId,
+    ft_actor_id: ActorId,
+    nft_actor_id: ActorId,
 }
 
 impl SupplyChain {
-    fn check_producer(&self, actor_id: ActorId) {
-        if !self.producers.contains(&actor_id) {
-            panic!("Actor must be a producer");
-        }
-    }
+    async fn produce(
+        &mut self,
+        msg_source: ActorId,
+        transaction_id: u64,
+        token_metadata: TokenMetadata,
+    ) -> SupplyChainEvent {
+        let item_id = utils::mint_nft(transaction_id, self.nft_actor_id, token_metadata).await;
 
-    fn check_distributor(&self, actor_id: ActorId) {
-        if !self.distributors.contains(&actor_id) {
-            panic!("Actor must be a distributor");
-        }
-    }
+        utils::transfer_nft(transaction_id, self.nft_actor_id, msg_source, item_id).await;
 
-    fn check_retailer(&self, actor_id: ActorId) {
-        if !self.retailers.contains(&actor_id) {
-            panic!("Actor must be a retailer");
-        }
-    }
-
-    async fn produce_item(&mut self, token_metadata: TokenMetadata) {
-        let msg_source = msg::source();
-        self.check_producer(msg_source);
-
-        let item_id = utils::mint_nft(self.nft_program, token_metadata).await;
-        utils::transfer_nft(self.nft_program, msg_source, item_id).await;
+        let item_state = ItemState {
+            state: Default::default(),
+            by: Role::Producer,
+        };
 
         self.items.insert(
             item_id,
             Item {
                 info: ItemInfo {
                     producer: msg_source,
-                    ..Default::default()
+                    state: item_state,
+                    distributor: Default::default(),
+                    retailer: Default::default(),
+                    price: Default::default(),
+                    delivery_time: Default::default(),
                 },
-                ..Default::default()
+                shipping_time: Default::default(),
             },
         );
-        utils::reply(SupplyChainEvent::Produced(item_id));
+
+        SupplyChainEvent {
+            item_id,
+            item_state,
+        }
     }
 
-    async fn put_up_for_sale_by_producer(&mut self, item_id: ItemId, price: u128) {
-        let msg_source = msg::source();
-        self.check_producer(msg_source);
-        let item = get_mut_item(&mut self.items, item_id);
-        assert_eq!(item.info.state, ItemState::Produced);
-        assert_eq!(item.info.producer, msg_source);
-
-        item.info.price = price;
-        utils::transfer_nft(self.nft_program, exec::program_id(), item_id).await;
-
-        item.info.state = ItemState::ForSaleByProducer;
-        utils::reply(SupplyChainEvent::ForSaleByProducer(item_id));
-    }
-
-    async fn purchase_by_distributor(&mut self, item_id: ItemId, delivery_time: u64) {
-        let msg_source = msg::source();
-        self.check_distributor(msg_source);
-        let item = get_mut_item(&mut self.items, item_id);
-        assert_eq!(item.info.state, ItemState::ForSaleByProducer);
+    async fn purchase(
+        &mut self,
+        msg_source: ActorId,
+        transaction_id: u64,
+        item_id: ItemId,
+        expected_by: Role,
+        by: Role,
+        delivery_time: u64,
+    ) -> SupplyChainEvent {
+        let item = get_mut_item(
+            &mut self.items,
+            item_id,
+            ItemState {
+                state: ItemEventState::ForSale,
+                by: expected_by,
+            },
+        );
 
         utils::transfer_ftokens(
-            self.ft_program,
+            transaction_id,
+            self.ft_actor_id,
             msg_source,
             exec::program_id(),
             item.info.price,
         )
         .await;
+
+        role_to_set_item_dr(by)(item, msg_source);
         item.info.delivery_time = delivery_time;
-        item.info.distributor = msg_source;
 
-        item.info.state = ItemState::PurchasedByDistributor;
-        utils::reply(SupplyChainEvent::PurchasedByDistributor(item_id));
+        item.set_state_and_get_event(
+            item_id,
+            ItemState {
+                state: ItemEventState::Purchased,
+                by,
+            },
+        )
     }
 
-    async fn approve_by_producer(&mut self, item_id: ItemId, approve: bool) {
-        let msg_source = msg::source();
-        self.check_producer(msg_source);
-        let item = get_mut_item(&mut self.items, item_id);
-        assert_eq!(item.info.state, ItemState::PurchasedByDistributor);
-        assert_eq!(item.info.producer, msg_source);
+    async fn put_up_for_sale(
+        &mut self,
+        msg_source: ActorId,
+        transaction_id: u64,
+        item_id: ItemId,
+        expected_item_event_state: ItemEventState,
+        by: Role,
+        price: u128,
+    ) -> SupplyChainEvent {
+        let item = get_mut_item(
+            &mut self.items,
+            item_id,
+            ItemState {
+                state: expected_item_event_state,
+                by,
+            },
+        );
+        role_to_assert_pdr(by)(item, msg_source);
 
-        item.info.state = if approve {
-            ItemState::ApprovedByProducer
-        } else {
-            utils::transfer_ftokens(
-                self.ft_program,
-                exec::program_id(),
-                item.info.distributor,
-                item.info.price,
-            )
-            .await;
-            ItemState::ForSaleByProducer
-        };
-
-        utils::reply(SupplyChainEvent::ApprovedByProducer(item_id));
-    }
-
-    fn ship_by_producer(&mut self, item_id: ItemId) {
-        let msg_source = msg::source();
-        self.check_producer(msg_source);
-        let item = get_mut_item(&mut self.items, item_id);
-        assert_eq!(item.info.state, ItemState::ApprovedByProducer);
-        assert_eq!(item.info.producer, msg_source);
-
-        item.shipping_time = exec::block_timestamp();
-
-        item.info.state = ItemState::ShippedByProducer;
-        utils::reply(SupplyChainEvent::ShippedByProducer(item_id));
-    }
-
-    async fn receive_by_distributor(&mut self, item_id: ItemId) {
-        let msg_source = msg::source();
-        self.check_distributor(msg_source);
-        let item = get_mut_item(&mut self.items, item_id);
-        assert_eq!(item.info.state, ItemState::ShippedByProducer);
-        assert_eq!(item.info.distributor, msg_source);
-
-        receive(self.ft_program, msg_source, item.info.producer, item).await;
-        utils::transfer_nft(self.nft_program, msg_source, item_id).await;
-
-        item.info.state = ItemState::ReceivedByDistributor;
-        utils::reply(SupplyChainEvent::ReceivedByDistributor(item_id));
-    }
-
-    fn process_by_distributor(&mut self, item_id: ItemId) {
-        let msg_source = msg::source();
-        self.check_distributor(msg_source);
-        let item = get_mut_item(&mut self.items, item_id);
-        assert_eq!(item.info.state, ItemState::ReceivedByDistributor);
-        assert_eq!(item.info.distributor, msg_source);
-
-        item.info.state = ItemState::ProcessedByDistributor;
-        utils::reply(SupplyChainEvent::ProcessedByDistributor(item_id));
-    }
-
-    fn package_by_distributor(&mut self, item_id: ItemId) {
-        let msg_source = msg::source();
-        self.check_distributor(msg_source);
-        let item = get_mut_item(&mut self.items, item_id);
-        assert_eq!(item.info.state, ItemState::ProcessedByDistributor);
-        assert_eq!(item.info.distributor, msg_source);
-
-        item.info.state = ItemState::PackagedByDistributor;
-        utils::reply(SupplyChainEvent::PackagedByDistributor(item_id));
-    }
-
-    async fn put_up_for_sale_by_distributor(&mut self, item_id: ItemId, price: u128) {
-        let msg_source = msg::source();
-        self.check_distributor(msg_source);
-        let item = get_mut_item(&mut self.items, item_id);
-        assert_eq!(item.info.state, ItemState::PackagedByDistributor);
-        assert_eq!(item.info.distributor, msg_source);
-
-        item.info.price = price;
-        utils::transfer_nft(self.nft_program, exec::program_id(), item_id).await;
-
-        item.info.state = ItemState::ForSaleByDistributor;
-        utils::reply(SupplyChainEvent::ForSaleByDistributor(item_id));
-    }
-
-    async fn purchase_by_retailer(&mut self, item_id: ItemId, delivery_time: u64) {
-        let msg_source = msg::source();
-        self.check_retailer(msg_source);
-        let item = get_mut_item(&mut self.items, item_id);
-        assert_eq!(item.info.state, ItemState::ForSaleByDistributor);
-
-        utils::transfer_ftokens(
-            self.ft_program,
-            msg_source,
+        utils::transfer_nft(
+            transaction_id,
+            self.nft_actor_id,
             exec::program_id(),
-            item.info.price,
+            item_id,
         )
         .await;
-        item.info.delivery_time = delivery_time;
-        item.info.retailer = msg_source;
+        item.info.price = price;
 
-        item.info.state = ItemState::PurchasedByRetailer;
-        utils::reply(SupplyChainEvent::PurchasedByRetailer(item_id));
+        item.set_state_and_get_event(
+            item_id,
+            ItemState {
+                state: ItemEventState::ForSale,
+                by,
+            },
+        )
     }
 
-    async fn approve_by_distributor(&mut self, item_id: ItemId, approve: bool) {
-        let msg_source = msg::source();
-        self.check_distributor(msg_source);
-        let item = get_mut_item(&mut self.items, item_id);
-        assert_eq!(item.info.state, ItemState::PurchasedByRetailer);
-        assert_eq!(item.info.distributor, msg_source);
+    async fn approve(
+        &mut self,
+        msg_source: ActorId,
+        transaction_id: u64,
+        item_id: ItemId,
+        expected_by: Role,
+        by: Role,
+        approve: bool,
+    ) -> SupplyChainEvent {
+        let item = get_mut_item(
+            &mut self.items,
+            item_id,
+            ItemState {
+                state: ItemEventState::Purchased,
+                by: expected_by,
+            },
+        );
+        role_to_assert_pdr(by)(item, msg_source);
 
-        item.info.state = if approve {
-            ItemState::ApprovedByDistributor
+        let item_state = if approve {
+            ItemState {
+                state: ItemEventState::Approved,
+                by,
+            }
         } else {
             utils::transfer_ftokens(
-                self.ft_program,
+                transaction_id,
+                self.ft_actor_id,
                 exec::program_id(),
-                item.info.retailer,
+                role_to_get_item_pdr(expected_by)(item),
                 item.info.price,
             )
             .await;
-            ItemState::ForSaleByDistributor
+            ItemState {
+                state: ItemEventState::ForSale,
+                by,
+            }
         };
 
-        utils::reply(SupplyChainEvent::ApprovedByDistributor(item_id));
+        item.set_state_and_get_event(item_id, item_state)
     }
 
-    fn ship_by_distributor(&mut self, item_id: ItemId) {
-        let msg_source = msg::source();
-        self.check_distributor(msg_source);
-        let item = get_mut_item(&mut self.items, item_id);
-        assert_eq!(item.info.state, ItemState::ApprovedByDistributor);
-        assert_eq!(item.info.distributor, msg_source);
+    fn ship(&mut self, msg_source: ActorId, item_id: ItemId, by: Role) -> SupplyChainEvent {
+        let item = get_mut_item(
+            &mut self.items,
+            item_id,
+            ItemState {
+                state: ItemEventState::Approved,
+                by,
+            },
+        );
+        role_to_assert_pdr(by)(item, msg_source);
 
         item.shipping_time = exec::block_timestamp();
 
-        item.info.state = ItemState::ShippedByDistributor;
-        utils::reply(SupplyChainEvent::ShippedByDistributor(item_id));
-    }
-
-    async fn receive_by_retailer(&mut self, item_id: ItemId) {
-        let msg_source = msg::source();
-        self.check_retailer(msg_source);
-        let item = get_mut_item(&mut self.items, item_id);
-        assert_eq!(item.info.state, ItemState::ShippedByDistributor);
-        assert_eq!(item.info.retailer, msg_source);
-
-        receive(self.ft_program, msg_source, item.info.distributor, item).await;
-        utils::transfer_nft(self.nft_program, msg_source, item_id).await;
-
-        item.info.state = ItemState::ReceivedByRetailer;
-        utils::reply(SupplyChainEvent::ReceivedByRetailer(item_id));
-    }
-
-    async fn put_up_for_sale_by_retailer(&mut self, item_id: ItemId, price: u128) {
-        let msg_source = msg::source();
-        self.check_retailer(msg_source);
-        let item = get_mut_item(&mut self.items, item_id);
-        assert_eq!(item.info.state, ItemState::ReceivedByRetailer);
-        assert_eq!(item.info.retailer, msg_source);
-
-        item.info.price = price;
-        utils::transfer_nft(self.nft_program, exec::program_id(), item_id).await;
-
-        item.info.state = ItemState::ForSaleByRetailer;
-        utils::reply(SupplyChainEvent::ForSaleByRetailer(item_id));
-    }
-
-    async fn purchase_by_consumer(&mut self, item_id: ItemId) {
-        let msg_source = msg::source();
-        let item = get_mut_item(&mut self.items, item_id);
-        assert_eq!(item.info.state, ItemState::ForSaleByRetailer);
-
-        utils::transfer_ftokens(
-            self.ft_program,
-            msg_source,
-            item.info.retailer,
-            item.info.price,
+        item.set_state_and_get_event(
+            item_id,
+            ItemState {
+                state: ItemEventState::Shipped,
+                by,
+            },
         )
-        .await;
-        utils::transfer_nft(self.nft_program, msg_source, item_id).await;
+    }
 
-        item.info.state = ItemState::PurchasedByConsumer;
-        utils::reply(SupplyChainEvent::PurchasedByConsumer(item_id));
+    async fn receive(
+        &mut self,
+        msg_source: ActorId,
+        transaction_id: u64,
+        item_id: ItemId,
+        expected_by: Role,
+        by: Role,
+    ) -> SupplyChainEvent {
+        let item = get_mut_item(
+            &mut self.items,
+            item_id,
+            ItemState {
+                state: ItemEventState::Shipped,
+                by: expected_by,
+            },
+        );
+        role_to_assert_pdr(by)(item, msg_source);
+
+        let program_id = exec::program_id();
+        let elapsed_time = exec::block_timestamp() - item.shipping_time;
+        // By default, all fungible tokens are transferred to a seller,
+        let (mut to, mut amount) = (role_to_get_item_pdr(expected_by)(item), item.info.price);
+
+        // but if the seller spends more time than was agreed...
+        if elapsed_time > item.info.delivery_time {
+            // ...and is extremely late (more than or exactly 2 times in this example),
+            if elapsed_time >= item.info.delivery_time * 2 {
+                // then all fungible tokens are refunded to a buyer...
+                to = msg_source;
+            } else {
+                // ...or another half is transferred to the seller...
+                amount /= 2;
+
+                // ...and a half of tokens is refunded to the buyer.
+                utils::transfer_ftokens(
+                    transaction_id + 1,
+                    self.ft_actor_id,
+                    program_id,
+                    msg_source,
+                    item.info.price - amount,
+                )
+                .await;
+            }
+        }
+
+        utils::transfer_ftokens(transaction_id, self.ft_actor_id, program_id, to, amount).await;
+        utils::transfer_nft(transaction_id, self.nft_actor_id, msg_source, item_id).await;
+
+        item.set_state_and_get_event(
+            item_id,
+            ItemState {
+                state: ItemEventState::Received,
+                by,
+            },
+        )
+    }
+
+    fn process_or_package(
+        &mut self,
+        msg_source: ActorId,
+        item_id: ItemId,
+        expected_item_event_state: ItemEventState,
+        state: ItemEventState,
+    ) -> SupplyChainEvent {
+        let item = get_mut_item(
+            &mut self.items,
+            item_id,
+            ItemState {
+                state: expected_item_event_state,
+                by: Role::Distributor,
+            },
+        );
+        item.assert_distributor(msg_source);
+
+        item.set_state_and_get_event(
+            item_id,
+            ItemState {
+                state,
+                by: Role::Distributor,
+            },
+        )
     }
 }
 
-static mut PROGRAM: Option<SupplyChain> = None;
+struct TransactionManager<T> {
+    transaction_id_nonce: u64,
+    transactions: BTreeMap<T, u64>,
+}
+
+impl<T> Default for TransactionManager<T> {
+    fn default() -> Self {
+        Self {
+            transaction_id_nonce: Default::default(),
+            transactions: Default::default(),
+        }
+    }
+}
+
+impl<T: Ord + Clone> TransactionManager<T> {
+    fn asquire_transaction<'a>(&'a mut self, key: &'a T) -> TransactionGuard<T> {
+        let transaction_id = if let Some(id) = self.transactions.get(key) {
+            *id
+        } else {
+            let id = self.transaction_id_nonce;
+
+            self.transaction_id_nonce = self.transaction_id_nonce.wrapping_add(1);
+            self.transactions.insert(key.clone(), id);
+
+            id
+        };
+
+        TransactionGuard {
+            transactions: &mut self.transactions,
+            key,
+            transaction_id,
+        }
+    }
+}
+
+struct TransactionGuard<'a, T: Ord> {
+    transactions: &'a mut BTreeMap<T, u64>,
+    key: &'a T,
+    transaction_id: u64,
+}
+
+impl<T: Ord> Drop for TransactionGuard<'_, T> {
+    fn drop(&mut self) {
+        self.transactions.remove(self.key);
+    }
+}
+
+#[derive(Default)]
+struct State {
+    state: SupplyChain,
+    transaction_manager: TransactionManager<(ActorId, SupplyChainAction)>,
+}
+
+static mut STATE: Option<State> = None;
+
+fn get_mut_state() -> &'static mut State {
+    unsafe { STATE.get_or_insert(Default::default()) }
+}
 
 #[no_mangle]
 extern "C" fn init() {
-    let InitSupplyChain {
+    let SupplyChainInit {
         producers,
         distributors,
         retailers,
-        ft_program,
-        nft_program,
-    } = msg::load().expect("Unable to decode `InitSupplyChain`");
+        ft_actor_id,
+        nft_actor_id,
+    } = msg::load().expect("Failed to load or decode `SupplyChainInit`");
 
     if [&producers, &distributors, &retailers]
         .iter()
@@ -338,116 +449,315 @@ extern "C" fn init() {
         panic!("Each `ActorId` of `producers`, `distributors`, and `retailers` mustn't equal `ActorId::zero()`");
     }
 
-    let supply_chain = SupplyChain {
+    let state = SupplyChain {
         producers,
         distributors,
         retailers,
-        ft_program,
-        nft_program,
+        ft_actor_id,
+        nft_actor_id,
         ..Default::default()
     };
+
     unsafe {
-        PROGRAM = Some(supply_chain);
+        STATE = Some(State {
+            state,
+            ..Default::default()
+        });
     }
 }
 
 #[async_main]
 async fn main() {
-    let action = msg::load().expect("Unable to decode `SupplyChainAction`");
-    let program = unsafe { PROGRAM.get_or_insert(Default::default()) };
-    match action {
-        SupplyChainAction::Produce { token_metadata } => program.produce_item(token_metadata).await,
-        SupplyChainAction::PutUpForSaleByProducer { item_id, price } => {
-            program.put_up_for_sale_by_producer(item_id, price).await
+    let contract_action = msg::load().expect("Failed to load or decode `SupplyChainAction`");
+    let msg_source = msg::source();
+
+    let State {
+        state: supply_chain,
+        transaction_manager,
+    } = get_mut_state();
+
+    let event = match contract_action {
+        SupplyChainAction::Consumer(action) => match action {
+            ConsumerAction::Purchase(item_id) => {
+                let key = (msg_source, contract_action);
+                let transaction_guard = transaction_manager.asquire_transaction(&key);
+
+                let item = get_mut_item(
+                    &mut supply_chain.items,
+                    item_id,
+                    ItemState {
+                        state: ItemEventState::ForSale,
+                        by: Role::Retailer,
+                    },
+                );
+
+                utils::transfer_ftokens(
+                    transaction_guard.transaction_id,
+                    supply_chain.ft_actor_id,
+                    msg_source,
+                    item.info.retailer,
+                    item.info.price,
+                )
+                .await;
+                utils::transfer_nft(
+                    transaction_guard.transaction_id,
+                    supply_chain.nft_actor_id,
+                    msg_source,
+                    item_id,
+                )
+                .await;
+
+                item.set_state_and_get_event(
+                    item_id,
+                    ItemState {
+                        state: ItemEventState::Purchased,
+                        by: Role::Consumer,
+                    },
+                )
+            }
+        },
+        SupplyChainAction::Producer(action) => {
+            if !supply_chain.producers.contains(&msg_source) {
+                panic!("`msg::source()` must be a producer");
+            }
+
+            match action {
+                ProducerAction::Produce { token_metadata } => {
+                    let key = (
+                        msg_source,
+                        SupplyChainAction::Producer(ProducerAction::Produce {
+                            token_metadata: token_metadata.clone(),
+                        }),
+                    );
+                    let transaction_guard = transaction_manager.asquire_transaction(&key);
+
+                    supply_chain
+                        .produce(msg_source, transaction_guard.transaction_id, token_metadata)
+                        .await
+                }
+                ProducerAction::PutUpForSale { item_id, price } => {
+                    let key = (msg_source, SupplyChainAction::Producer(action));
+                    let transaction_guard = transaction_manager.asquire_transaction(&key);
+
+                    supply_chain
+                        .put_up_for_sale(
+                            msg_source,
+                            transaction_guard.transaction_id,
+                            item_id,
+                            ItemEventState::Produced,
+                            Role::Producer,
+                            price,
+                        )
+                        .await
+                }
+                ProducerAction::Approve { item_id, approve } => {
+                    let key = (msg_source, SupplyChainAction::Producer(action));
+                    let transaction_guard = transaction_manager.asquire_transaction(&key);
+
+                    supply_chain
+                        .approve(
+                            msg_source,
+                            transaction_guard.transaction_id,
+                            item_id,
+                            Role::Distributor,
+                            Role::Producer,
+                            approve,
+                        )
+                        .await
+                }
+                ProducerAction::Ship(item_id) => {
+                    supply_chain.ship(msg_source, item_id, Role::Producer)
+                }
+            }
         }
-        SupplyChainAction::PurchaseByDistributor {
-            item_id,
-            delivery_time,
-        } => {
-            program
-                .purchase_by_distributor(item_id, delivery_time)
-                .await
+        SupplyChainAction::Distributor(action) => {
+            if !supply_chain.distributors.contains(&msg_source) {
+                panic!("`msg::source()` must be a distributor");
+            }
+
+            let key = (msg_source, contract_action);
+
+            match action {
+                DistributorAction::Purchase {
+                    item_id,
+                    delivery_time,
+                } => {
+                    let transaction_guard = transaction_manager.asquire_transaction(&key);
+
+                    supply_chain
+                        .purchase(
+                            msg_source,
+                            transaction_guard.transaction_id,
+                            item_id,
+                            Role::Producer,
+                            Role::Distributor,
+                            delivery_time,
+                        )
+                        .await
+                }
+                DistributorAction::Receive(item_id) => {
+                    let transaction_guard = transaction_manager.asquire_transaction(&key);
+
+                    supply_chain
+                        .receive(
+                            msg_source,
+                            transaction_guard.transaction_id,
+                            item_id,
+                            Role::Producer,
+                            Role::Distributor,
+                        )
+                        .await
+                }
+                DistributorAction::Process(item_id) => supply_chain.process_or_package(
+                    msg_source,
+                    item_id,
+                    ItemEventState::Received,
+                    ItemEventState::Processed,
+                ),
+                DistributorAction::Package(item_id) => supply_chain.process_or_package(
+                    msg_source,
+                    item_id,
+                    ItemEventState::Processed,
+                    ItemEventState::Packaged,
+                ),
+                DistributorAction::PutUpForSale { item_id, price } => {
+                    let transaction_guard = transaction_manager.asquire_transaction(&key);
+
+                    supply_chain
+                        .put_up_for_sale(
+                            msg_source,
+                            transaction_guard.transaction_id,
+                            item_id,
+                            ItemEventState::Packaged,
+                            Role::Distributor,
+                            price,
+                        )
+                        .await
+                }
+                DistributorAction::Approve { item_id, approve } => {
+                    let transaction_guard = transaction_manager.asquire_transaction(&key);
+
+                    supply_chain
+                        .approve(
+                            msg_source,
+                            transaction_guard.transaction_id,
+                            item_id,
+                            Role::Retailer,
+                            Role::Distributor,
+                            approve,
+                        )
+                        .await
+                }
+                DistributorAction::Ship(item_id) => {
+                    supply_chain.ship(msg_source, item_id, Role::Distributor)
+                }
+            }
         }
-        SupplyChainAction::ApproveByProducer { item_id, approve } => {
-            program.approve_by_producer(item_id, approve).await
+        SupplyChainAction::Retailer(action) => {
+            if !supply_chain.retailers.contains(&msg_source) {
+                panic!("`msg::source()` must be a retailer");
+            }
+
+            let key = (msg_source, contract_action);
+            let transaction_guard = transaction_manager.asquire_transaction(&key);
+
+            match action {
+                RetailerAction::Purchase {
+                    item_id,
+                    delivery_time,
+                } => {
+                    supply_chain
+                        .purchase(
+                            msg_source,
+                            transaction_guard.transaction_id,
+                            item_id,
+                            Role::Distributor,
+                            Role::Retailer,
+                            delivery_time,
+                        )
+                        .await
+                }
+                RetailerAction::Receive(item_id) => {
+                    supply_chain
+                        .receive(
+                            msg_source,
+                            transaction_guard.transaction_id,
+                            item_id,
+                            Role::Distributor,
+                            Role::Retailer,
+                        )
+                        .await
+                }
+                RetailerAction::PutUpForSale { item_id, price } => {
+                    supply_chain
+                        .put_up_for_sale(
+                            msg_source,
+                            transaction_guard.transaction_id,
+                            item_id,
+                            ItemEventState::Received,
+                            Role::Retailer,
+                            price,
+                        )
+                        .await
+                }
+            }
         }
-        SupplyChainAction::ShipByProducer(item_id) => program.ship_by_producer(item_id),
-        SupplyChainAction::ReceiveByDistributor(item_id) => {
-            program.receive_by_distributor(item_id).await
-        }
-        SupplyChainAction::ProcessByDistributor(item_id) => program.process_by_distributor(item_id),
-        SupplyChainAction::PackageByDistributor(item_id) => program.package_by_distributor(item_id),
-        SupplyChainAction::PutUpForSaleByDistributor { item_id, price } => {
-            program.put_up_for_sale_by_distributor(item_id, price).await
-        }
-        SupplyChainAction::PurchaseByRetailer {
-            item_id,
-            delivery_time,
-        } => program.purchase_by_retailer(item_id, delivery_time).await,
-        SupplyChainAction::ApproveByDistributor { item_id, approve } => {
-            program.approve_by_distributor(item_id, approve).await
-        }
-        SupplyChainAction::ShipByDistributor(item_id) => program.ship_by_distributor(item_id),
-        SupplyChainAction::ReceiveByRetailer(item_id) => program.receive_by_retailer(item_id).await,
-        SupplyChainAction::PutUpForSaleByRetailer { item_id, price } => {
-            program.put_up_for_sale_by_retailer(item_id, price).await
-        }
-        SupplyChainAction::PurchaseByConsumer(item_id) => {
-            program.purchase_by_consumer(item_id).await
-        }
-    }
+    };
+
+    msg::reply(event, 0).expect("Failed to reply or encode `SupplyChainEvent`");
 }
 
 #[no_mangle]
 extern "C" fn meta_state() -> *mut [i32; 2] {
-    let query = msg::load().expect("Unable to decode `SupplyChainStateQuery`");
-    let program = unsafe { PROGRAM.get_or_insert(Default::default()) };
-    let encoded = match query {
+    let query = msg::load().expect("Failed to load or decode `SupplyChainStateQuery`");
+    let supply_chain = &get_mut_state().state;
+
+    let reply = match query {
         SupplyChainStateQuery::ItemInfo(item_id) => {
-            SupplyChainStateReply::ItemInfo(if let Some(item) = program.items.get(&item_id) {
-                item.info
-            } else {
-                Default::default()
-            })
+            SupplyChainStateReply::ItemInfo(supply_chain.items.get(&item_id).map(|item| item.info))
         }
-        SupplyChainStateQuery::Participants => SupplyChainStateReply::Participants(Participants {
-            producers: program.producers.clone(),
-            distributors: program.distributors.clone(),
-            retailers: program.retailers.clone(),
+        SupplyChainStateQuery::Participants => SupplyChainStateReply::Participants {
+            producers: supply_chain.producers.clone(),
+            distributors: supply_chain.distributors.clone(),
+            retailers: supply_chain.retailers.clone(),
+        },
+        SupplyChainStateQuery::Roles(actor_id) => SupplyChainStateReply::Roles({
+            let mut roles = BTreeSet::from([Role::Consumer]);
+
+            if supply_chain.producers.contains(&actor_id) {
+                roles.insert(Role::Producer);
+            }
+            if supply_chain.distributors.contains(&actor_id) {
+                roles.insert(Role::Distributor);
+            }
+            if supply_chain.retailers.contains(&actor_id) {
+                roles.insert(Role::Retailer);
+            }
+
+            roles
         }),
-        SupplyChainStateQuery::FTProgram => SupplyChainStateReply::FTProgram(program.ft_program),
-        SupplyChainStateQuery::NFTProgram => SupplyChainStateReply::NFTProgram(program.nft_program),
         SupplyChainStateQuery::ExistingItems => SupplyChainStateReply::ExistingItems(
-            program
+            supply_chain
                 .items
                 .iter()
                 .map(|item| (*item.0, item.1.info))
                 .collect(),
         ),
-        SupplyChainStateQuery::Roles(actor_id) => {
-            let mut roles = BTreeSet::new();
-
-            if program.producers.contains(&actor_id) {
-                roles.insert(Role::Producer);
-            }
-            if program.distributors.contains(&actor_id) {
-                roles.insert(Role::Distributor);
-            }
-            if program.retailers.contains(&actor_id) {
-                roles.insert(Role::Retailer);
-            }
-
-            SupplyChainStateReply::Roles(roles)
+        SupplyChainStateQuery::FtContractActorId => {
+            SupplyChainStateReply::FtContractActorId(supply_chain.ft_actor_id)
         }
-    }
-    .encode();
-    gstd::util::to_leak_ptr(encoded)
+        SupplyChainStateQuery::NftContractActorId => {
+            SupplyChainStateReply::NftContractActorId(supply_chain.nft_actor_id)
+        }
+    };
+
+    util::to_leak_ptr(reply.encode())
 }
 
 gstd::metadata! {
     title: "Supply chain",
     init:
-        input: InitSupplyChain,
+        input: SupplyChainInit,
     handle:
         input: SupplyChainAction,
         output: SupplyChainEvent,

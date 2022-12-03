@@ -6,13 +6,13 @@ use gstd::{prelude::*, ActorId};
 /// Should equal [`TokenId`] of an item's NFT.
 pub type ItemId = TokenId;
 
-/// Initializes the supply chain program.
+/// Initializes the Supply chain contract.
 ///
 /// # Requirements
-/// * Each [`ActorId`] of `producers`, `distributors`, and `retailers` mustn't
+/// - Each [`ActorId`] of `producers`, `distributors`, and `retailers` mustn't
 /// equal [`ActorId::zero()`].
-#[derive(Encode, Decode, TypeInfo, Clone)]
-pub struct InitSupplyChain {
+#[derive(Encode, Decode, TypeInfo, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone)]
+pub struct SupplyChainInit {
     /// IDs of actors that'll have the right to interact with a supply chain on
     /// behalf of a producer.
     pub producers: BTreeSet<ActorId>,
@@ -23,493 +23,431 @@ pub struct InitSupplyChain {
     /// behalf of a retailer.
     pub retailers: BTreeSet<ActorId>,
 
-    /// A FT program [`ActorId`].
-    pub ft_program: ActorId,
-    /// An NFT program [`ActorId`].
-    pub nft_program: ActorId,
+    /// A FT contract [`ActorId`].
+    pub ft_actor_id: ActorId,
+    /// An NFT contract [`ActorId`].
+    pub nft_actor_id: ActorId,
 }
 
-/// Sends a program info about what it should do.
-#[derive(Encode, Decode, TypeInfo)]
+/// Sends the contract info about what it should do.
+#[derive(Encode, Decode, TypeInfo, Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub enum SupplyChainAction {
-    /// Produces one item and corresponding NFT with given `token_metadata`.
+    Producer(ProducerAction),
+    Distributor(DistributorAction),
+    Retailer(RetailerAction),
+    Consumer(ConsumerAction),
+}
+
+/// Actions for a producer.
+///
+/// Should be used inside [`SupplyChainAction`].
+#[derive(Encode, Decode, TypeInfo, Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
+pub enum ProducerAction {
+    /// Produces one item and a corresponding NFT with given `token_metadata`.
     ///
-    /// Transfers a created NFT for an item to a producer ([`msg::source()`]).
+    /// Transfers the created NFT for the item to a producer
+    /// ([`msg::source()`]).
     ///
     /// # Requirements
-    /// * [`msg::source()`] must be a producer in a supply chain.
+    /// - [`msg::source()`] must be a producer in a supply chain.
     ///
-    /// On success, returns [`SupplyChainEvent::Produced`].
+    /// On success, replies with [`SupplyChainEvent`] where [`ItemState`]
+    /// contains [`ItemEventState::Produced`] & [`Role::Producer`].
     ///
     /// [`msg::source()`]: gstd::msg::source
     Produce {
-        /// Item's NFT metadata.
+        /// Item’s NFT metadata.
         token_metadata: TokenMetadata,
     },
 
-    /// Puts a produced item up for sale to a distributor for given `price` on
+    /// Puts a produced item up for sale to distributors for given `price` on
     /// behalf of a producer.
     ///
-    /// Transfers an item's NFT to a supply chain program.
+    /// Transfers an item's NFT to the Supply chain contract
+    /// ([`exec::program_id()`](gstd::exec::program_id)).
     ///
     /// # Requirements
-    /// * An item must exist in a supply chain.
-    /// * [`msg::source()`](gstd::msg::source) must be a producer of an item in
-    /// a supply chain.
-    /// * Item's [`ItemState`] must be [`Produced`](ItemState::Produced).
+    /// - The item must exist in a supply chain.
+    /// - [`msg::source()`](gstd::msg::source) must be the producer of the item.
+    /// - Item's [`ItemState`] must contain [`ItemEventState::Produced`] &
+    /// [`Role::Producer`].
     ///
-    /// On success, returns [`SupplyChainEvent::ForSaleByProducer`].
-    PutUpForSaleByProducer {
+    /// On success, replies with [`SupplyChainEvent`] where [`ItemState`]
+    /// contains [`ItemEventState::ForSale`] & [`Role::Producer`].
+    PutUpForSale {
         item_id: ItemId,
         /// An item's price.
         price: u128,
-    },
-
-    /// Purchases an item from a producer on behalf of a distributor.
-    ///
-    /// Transfers fungible tokens for purchasing an item to a supply chain
-    /// program until an item is received (by
-    /// [`SupplyChainAction::ReceiveByDistributor`]).
-    ///
-    /// **Note:** An item's producer must approve or not this purchase by
-    /// [`SupplyChainAction::ApproveByProducer`].
-    ///
-    /// # Requirements
-    /// * An item must exist in a supply chain.
-    /// * [`msg::source()`] must be a distributor in a supply chain.
-    /// * Item's [`ItemState`] must be
-    /// [`ForSaleByProducer`](ItemState::ForSaleByProducer).
-    ///
-    /// On success, returns [`SupplyChainEvent::PurchasedByDistributor`].
-    ///
-    /// [`msg::source()`]: gstd::msg::source
-    PurchaseByDistributor {
-        item_id: ItemId,
-        /// Milliseconds during which a producer should deliver an item. A
-        /// countdown starts after [`SupplyChainAction::ShipByProducer`] is
-        /// executed.
-        delivery_time: u64,
     },
 
     /// Approves or not a distributor's purchase on behalf of a producer.
     ///
-    /// If a purchase is approved, then item's [`ItemState`] changes to
-    /// [`ApprovedByProducer`](ItemState::ApprovedByProducer) and an item can be
-    /// shipped (by [`SupplyChainAction::ShipByProducer`]).
+    /// If the purchase is approved, then item's [`ItemEventState`] changes to
+    /// [`Approved`](ItemEventState::Approved) and, from that moment, an item
+    /// can be shipped (by [`ProducerAction::Ship`]).
     ///
-    /// If a purchase is **not** approved, then fungible tokens for it are
-    /// refunded from a supply chain program to a distributor.
+    /// If the purchase is **not** approved, then fungible tokens for it are
+    /// refunded from the Supply chain contract
+    /// ([`exec::program_id()`](gstd::exec::program_id)) to the item's
+    /// distributor and item's [`ItemEventState`] changes back to
+    /// [`ForSale`](ItemEventState::ForSale).
     ///
     /// # Requirements
-    /// * An item must exist in a supply chain.
-    /// * [`msg::source()`](gstd::msg::source) must be a producer of an item in
-    /// a supply chain.
-    /// * Item's [`ItemState`] must be
-    /// [`PurchasedByDistributor`](ItemState::PurchasedByDistributor).
+    /// - The item must exist in a supply chain.
+    /// - [`msg::source()`](gstd::msg::source) must be the producer of the item.
+    /// - Item's [`ItemState`] must contain [`ItemEventState::Produced`] &
+    /// [`Role::Distributor`].
     ///
-    /// On success, returns [`SupplyChainEvent::ApprovedByProducer`].
-    ApproveByProducer {
+    /// On success, replies with [`SupplyChainEvent`] where [`ItemState`]
+    /// contains [`ItemEventState::Approved`]/[`ItemEventState::ForSale`] &
+    /// [`Role::Producer`].
+    Approve {
         item_id: ItemId,
         /// Yes ([`true`]) or no ([`false`]).
         approve: bool,
     },
 
-    /// Starts shipping a purchased item to a distributor on behalf of a
+    /// Starts a shipping of a purchased item to a distributor on behalf of a
     /// producer.
     ///
-    /// Starts a countdown for a delivery time specified for an item in
-    /// [`SupplyChainAction::PurchaseByDistributor`].
+    /// Starts the countdown for the delivery time specified for the item in
+    /// [`DistributorAction::Purchase`].
     ///
     /// # Requirements
-    /// * An item must exist in a supply chain.
-    /// * [`msg::source()`](gstd::msg::source) must be a producer of an item in
-    /// a supply chain.
-    /// * Item's [`ItemState`] must be
-    /// [`ApprovedByProducer`](ItemState::ApprovedByProducer).
+    /// - The item must exist in a supply chain.
+    /// - [`msg::source()`](gstd::msg::source) must be the producer of the item.
+    /// - Item's [`ItemState`] must contain [`ItemEventState::Approved`] &
+    /// [`Role::Producer`].
     ///
-    /// On success, returns [`SupplyChainEvent::ShippedByProducer`].
-    ShipByProducer(ItemId),
+    /// On success, replies with [`SupplyChainEvent`] where [`ItemState`]
+    /// contains [`ItemEventState::Shipped`] & [`Role::Producer`].
+    Ship(ItemId),
+}
+
+/// Actions for a distributor.
+///
+/// Should be used inside [`SupplyChainAction`].
+#[derive(Encode, Decode, TypeInfo, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+pub enum DistributorAction {
+    /// Purchases an item from a producer on behalf of a distributor.
+    ///
+    /// Transfers fungible tokens for purchasing the item to the Supply chain
+    /// contract ([`exec::program_id()`](gstd::exec::program_id)) until the item
+    /// is received (by [`DistributorAction::Receive`]).
+    ///
+    /// **Note:** the item's producer must approve or not this purchase by
+    /// [`ProducerAction::Approve`].
+    ///
+    /// # Requirements
+    /// - The item must exist in a supply chain.
+    /// - [`msg::source()`](gstd::msg::source) must be a distributor.
+    /// - Item's [`ItemState`] must contain [`ItemEventState::ForSale`] &
+    /// [`Role::Producer`].
+    ///
+    /// On success, replies with [`SupplyChainEvent`] where [`ItemState`]
+    /// contains [`ItemEventState::Purchased`] & [`Role::Distributor`].
+    Purchase {
+        item_id: ItemId,
+        /// Milliseconds during which the producer of an item should deliver it.
+        /// A countdown starts after [`ProducerAction::Ship`] is executed.
+        delivery_time: u64,
+    },
 
     /// Receives a shipped item from a producer on behalf of a distributor.
     ///
-    /// Depending on a time spent on a delivery, transfers fungible tokens for
-    /// purchasing an item from a supply chain program to a producer or, as a
-    /// penalty for being late, refunds some or all of them to a distributor.
+    /// Depending on the time spent on a delivery, transfers fungible tokens for
+    /// purchasing the item from the Supply chain contract
+    /// ([`exec::program_id()`](gstd::exec::program_id)) to the item's producer
+    /// or, as a penalty for being late, refunds a half or all of them to the
+    /// item's distributor ([`msg::source()`]).
     ///
-    /// Transfers an item's NFT to a distributor ([`msg::source()`]).
+    /// Transfers an item's NFT to the distributor ([`msg::source()`]).
     ///
     /// # Requirements
-    /// * An item must exist in a supply chain.
-    /// * [`msg::source()`] must be a distributor of an item in a supply chain.
-    /// * Item's [`ItemState`] must be
-    /// [`ShippedByProducer`](ItemState::ShippedByProducer).
+    /// - The item must exist in a supply chain.
+    /// - [`msg::source()`] must be the distributor of the item.
+    /// - Item's [`ItemState`] must contain [`ItemEventState::Shipped`] &
+    /// [`Role::Producer`].
     ///
-    /// On success, returns [`SupplyChainEvent::ReceivedByDistributor`].
+    /// On success, replies with [`SupplyChainEvent`] where [`ItemState`]
+    /// contains [`ItemEventState::Received`] & [`Role::Distributor`].
     ///
     /// [`msg::source()`]: gstd::msg::source
-    ReceiveByDistributor(ItemId),
+    Receive(ItemId),
 
     /// Processes a received item on behalf of a distributor.
     ///
     /// # Requirements
-    /// * An item must exist in a supply chain.
-    /// * [`msg::source()`](gstd::msg::source) must be a distributor of an item
-    /// in a supply chain.
-    /// * Item's [`ItemState`] must be
-    /// [`ReceivedByDistributor`](ItemState::ReceivedByDistributor).
+    /// - The item must exist in a supply chain.
+    /// - [`msg::source()`](gstd::msg::source) must be the distributor of the
+    /// item.
+    /// - Item's [`ItemState`] must contain [`ItemEventState::Received`] &
+    /// [`Role::Distributor`].
     ///
-    /// On success, returns [`SupplyChainEvent::ProcessedByDistributor`].
-    ProcessByDistributor(ItemId),
+    /// On success, replies with [`SupplyChainEvent`] where [`ItemState`]
+    /// contains [`ItemEventState::Processed`] & [`Role::Distributor`].
+    Process(ItemId),
 
     /// Packages a processed item on behalf of a distributor.
     ///
     /// # Requirements
-    /// * An item must exist in a supply chain.
-    /// * [`msg::source()`](gstd::msg::source) must be a distributor of an item
-    /// in a supply chain.
-    /// * Item's [`ItemState`] must be
-    /// [`ProcessedByDistributor`](ItemState::ProcessedByDistributor).
+    /// - The item must exist in a supply chain.
+    /// - [`msg::source()`](gstd::msg::source) must be the distributor of the
+    /// item.
+    /// - Item's [`ItemState`] must contain [`ItemEventState::Processed`] &
+    /// [`Role::Distributor`].
     ///
-    /// On success, returns [`SupplyChainEvent::PackagedByDistributor`].
-    PackageByDistributor(ItemId),
+    /// On success, replies with [`SupplyChainEvent`] where [`ItemState`]
+    /// contains [`ItemEventState::Packaged`] & [`Role::Distributor`].
+    Package(ItemId),
 
-    /// Puts a packaged item up for sale to a retailer for given `price` on
+    /// Puts a packaged item up for sale to retailers for given `price` on
     /// behalf of a distributor.
     ///
-    /// Transfers an item's NFT to a supply chain program.
+    /// Transfers an item's NFT to the Supply chain contract
+    /// ([`exec::program_id()`](gstd::exec::program_id)).
     ///
     /// # Requirements
-    /// * An item must exist in a supply chain.
-    /// * [`msg::source()`](gstd::msg::source) must be a distributor of an item
-    /// in a supply chain.
-    /// * Item's [`ItemState`] must be
-    /// [`PackagedByDistributor`](ItemState::PackagedByDistributor).
+    /// - The item must exist in a supply chain.
+    /// - [`msg::source()`](gstd::msg::source) must be the distributor of the
+    /// item.
+    /// - Item's [`ItemState`] must contain [`ItemEventState::Packaged`] &
+    /// [`Role::Distributor`].
     ///
-    /// On success, returns [`SupplyChainEvent::ForSaleByDistributor`].
-    PutUpForSaleByDistributor {
+    /// On success, replies with [`SupplyChainEvent`] where [`ItemState`]
+    /// contains [`ItemEventState::ForSale`] & [`Role::Distributor`].
+    PutUpForSale {
         item_id: ItemId,
         /// An item's price.
         price: u128,
     },
 
-    /// Purchases an item from a distributor on behalf of a retailer.
-    ///
-    /// Transfers fungible tokens for purchasing an item to a supply chain
-    /// program until an item is received (by
-    /// [`SupplyChainAction::ReceiveByRetailer`]).
-    ///
-    /// **Note:** An item's distributor must approve or not this purchase by
-    /// [`SupplyChainAction::ApproveByDistributor`].
-    ///
-    /// # Requirements
-    /// * An item must exist in a supply chain.
-    /// * [`msg::source()`] must be a retailer in a supply chain.
-    /// * Item's [`ItemState`] must be
-    /// [`ForSaleByDistributor`](ItemState::ForSaleByDistributor).
-    ///
-    /// On success, returns [`SupplyChainEvent::PurchasedByRetailer`].
-    ///
-    /// [`msg::source()`]: gstd::msg::source
-    PurchaseByRetailer {
-        item_id: ItemId,
-        /// Milliseconds during which a distributor should deliver an item. A
-        /// countdown starts after [`SupplyChainAction::ShipByDistributor`] is
-        /// executed.
-        delivery_time: u64,
-    },
-
     /// Approves or not a retailer's purchase on behalf of a distributor.
     ///
-    /// If a purchase is approved, then item's [`ItemState`] changes to
-    /// [`ApprovedByDistributor`](ItemState::ApprovedByDistributor) and an item
-    /// can be shipped (by [`SupplyChainAction::ShipByDistributor`]).
+    /// If the purchase is approved, then item's [`ItemEventState`] changes to
+    /// [`Approved`](ItemEventState::Approved) and, from that moment, an item
+    /// can be shipped (by [`DistributorAction::Ship`]).
     ///
-    /// If a purchase is **not** approved, then fungible tokens for it are
-    /// refunded from a supply chain program to a retailer.
+    /// If the purchase is **not** approved, then fungible tokens for it are
+    /// refunded from the Supply chain contract
+    /// ([`exec::program_id()`](gstd::exec::program_id)) to the item's retailer
+    /// and item's [`ItemEventState`] changes back to
+    /// [`ForSale`](ItemEventState::ForSale).
     ///
     /// # Requirements
-    /// * An item must exist in a supply chain.
-    /// * [`msg::source()`](gstd::msg::source) must be a distributor of an item
-    /// in a supply chain.
-    /// * Item's [`ItemState`] must be
-    /// [`PurchasedByRetailer`](ItemState::PurchasedByRetailer).
+    /// - The item must exist in a supply chain.
+    /// - [`msg::source()`](gstd::msg::source) must be the distributor of the
+    /// item.
+    /// - Item's [`ItemState`] must contain [`ItemEventState::Purchased`] &
+    /// [`Role::Retailer`].
     ///
-    /// On success, returns [`SupplyChainEvent::ApprovedByDistributor`].
-    ApproveByDistributor {
+    /// On success, replies with [`SupplyChainEvent`] where [`ItemState`]
+    /// contains [`ItemEventState::Approved`]/[`ItemEventState::ForSale`] &
+    /// [`Role::Distributor`].
+    Approve {
         item_id: ItemId,
         /// Yes ([`true`]) or no ([`false`]).
         approve: bool,
     },
 
-    /// Starts shipping a purchased item to a retailer on behalf of a
+    /// Starts a shipping of a purchased item to a retailer on behalf of a
     /// distributor.
     ///
-    /// Starts a countdown for a delivery time specified for this item in
-    /// [`SupplyChainAction::PurchaseByRetailer`].
+    /// Starts the countdown for the delivery time specified for the item in
+    /// [`RetailerAction::Purchase`].
     ///
     /// # Requirements
-    /// * An item must exist in a supply chain.
-    /// * [`msg::source()`](gstd::msg::source) must be a distributor of an item
-    /// in a supply chain.
-    /// * Item's [`ItemState`] must be
-    /// [`ApprovedByDistributor`](ItemState::ApprovedByDistributor).
+    /// - The item must exist in a supply chain.
+    /// - [`msg::source()`](gstd::msg::source) must be the distributor of the
+    /// item.
+    /// - Item's [`ItemState`] must contain [`ItemEventState::Approved`] &
+    /// [`Role::Distributor`].
     ///
-    /// On success, returns [`SupplyChainEvent::ShippedByDistributor`].
-    ShipByDistributor(ItemId),
+    /// On success, replies with [`SupplyChainEvent`] where [`ItemState`]
+    /// contains [`ItemEventState::Shipped`] & [`Role::Distributor`].
+    Ship(ItemId),
+}
+
+/// Actions for a retailer.
+///
+/// Should be used inside [`SupplyChainAction`].
+#[derive(Encode, Decode, TypeInfo, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+pub enum RetailerAction {
+    /// Purchases an item from a distributor on behalf of a retailer.
+    ///
+    /// Transfers fungible tokens for purchasing the item to the Supply chain
+    /// contract ([`exec::program_id()`](gstd::exec::program_id)) until the item
+    /// is received (by [`RetailerAction::Receive`]).
+    ///
+    /// **Note:** the item's distributor must approve or not this purchase by
+    /// [`DistributorAction::Approve`].
+    ///
+    /// # Requirements
+    /// - The item must exist in a supply chain.
+    /// - [`msg::source()`](gstd::msg::source) must be a retailer.
+    /// - Item's [`ItemState`] must contain [`ItemEventState::ForSale`] &
+    /// [`Role::Distributor`].
+    ///
+    /// On success, replies with [`SupplyChainEvent`] where [`ItemState`]
+    /// contains [`ItemEventState::Purchased`] & [`Role::Retailer`].
+    Purchase {
+        item_id: ItemId,
+        /// Milliseconds during which the distributor of an item should deliver
+        /// it. A countdown starts after [`DistributorAction::Ship`] is
+        /// executed.
+        delivery_time: u64,
+    },
 
     /// Receives a shipped item from a distributor on behalf of a retailer.
     ///
-    /// Depending on a time spent on a delivery, transfers fungible tokens for
-    /// purchasing an item from a supply chain program to a distributor or, as a
-    /// penalty for being late, refunds some or all of them to a retailer.
+    /// Depending on the time spent on a delivery, transfers fungible tokens for
+    /// purchasing the item from the Supply chain contract
+    /// ([`exec::program_id()`](gstd::exec::program_id)) to the item's
+    /// distributor or, as a penalty for being late, refunds a half or all of
+    /// them to the item's retailer ([`msg::source()`]).
     ///
-    /// Transfers an item's NFT to a retailer ([`msg::source()`]).
+    /// Transfers an item's NFT to the retailer ([`msg::source()`]).
     ///
     /// # Requirements
-    /// * An item must exist in a supply chain.
-    /// * [`msg::source()`] must be a retailer of an item in
-    /// a supply chain.
-    /// * Item's [`ItemState`] must be
-    /// [`ShippedByDistributor`](ItemState::ShippedByDistributor).
+    /// - The item must exist in a supply chain.
+    /// - [`msg::source()`] must be the retailer of the item.
+    /// - Item's [`ItemState`] must contain [`ItemEventState::Shipped`] &
+    /// [`Role::Distributor`].
     ///
-    /// On success, returns [`SupplyChainEvent::ReceivedByRetailer`].
+    /// On success, replies with [`SupplyChainEvent`] where [`ItemState`]
+    /// contains [`ItemEventState::Received`] & [`Role::Retailer`].
     ///
     /// [`msg::source()`]: gstd::msg::source
-    ReceiveByRetailer(ItemId),
+    Receive(ItemId),
 
-    /// Puts a received item up for sale to a consumer for given `price` on
+    /// Puts a received item up for sale to consumers for given `price` on
     /// behalf of a retailer.
     ///
-    /// Transfers an item's NFT to a supply chain program.
+    /// Transfers an item's NFT to the Supply chain contract
+    /// ([`exec::program_id()`](gstd::exec::program_id)).
     ///
     /// # Requirements
-    /// * An item must exist in a supply chain.
-    /// * [`msg::source()`](gstd::msg::source) must be a retailer of an item in
-    /// a supply chain.
-    /// * Item's [`ItemState`] must be
-    /// [`ReceivedByRetailer`](ItemState::ReceivedByRetailer).
+    /// - The item must exist in a supply chain.
+    /// - [`msg::source()`](gstd::msg::source) must be the retailer of the item.
+    /// - Item's [`ItemState`] must contain [`ItemEventState::Received`] &
+    /// [`Role::Retailer`].
     ///
-    /// On success, returns [`SupplyChainEvent::ForSaleByRetailer`].
-    PutUpForSaleByRetailer {
+    /// On success, replies with [`SupplyChainEvent`] where [`ItemState`]
+    /// contains [`ItemEventState::ForSale`] & [`Role::Retailer`].
+    PutUpForSale {
         item_id: ItemId,
         /// An item's price.
         price: u128,
     },
+}
 
+/// Actions for a consumer.
+///
+/// Should be used inside [`SupplyChainAction`].
+#[derive(Encode, Decode, TypeInfo, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+pub enum ConsumerAction {
     /// Purchases an item from a retailer.
     ///
-    /// Transfers fungible tokens for purchasing an item to its retailer.
+    /// Transfers fungible tokens for purchasing the item to its retailer.
     ///
-    /// Transfers an item's NFT to a consumer
+    /// Transfers an item's NFT to the consumer
     /// ([`msg::source()`](gstd::msg::source)).
     ///
     /// # Requirements
-    /// * An item must exist in a supply chain.
-    /// * Item's [`ItemState`] must be
-    /// [`ForSaleByRetailer`](ItemState::ForSaleByRetailer).
+    /// - The item must exist in a supply chain.
+    /// - Item's [`ItemState`] must be
+    /// - Item's [`ItemState`] must contain [`ItemEventState::ForSale`] &
+    /// [`Role::Retailer`].
     ///
-    /// On success, returns [`SupplyChainEvent::PurchasedByConsumer`].
-    PurchaseByConsumer(ItemId),
+    /// On success, replies with [`SupplyChainEvent`] where [`ItemState`]
+    /// contains [`ItemEventState::Purchased`] & [`Role::Consumer`].
+    Purchase(ItemId),
 }
 
 /// A result of processed [`SupplyChainAction`].
-#[derive(Encode, Decode, TypeInfo)]
-pub enum SupplyChainEvent {
-    /// Should be returned from [`SupplyChainAction::Produce`].
-    Produced(
-        /// An ID of a produced item.
-        ItemId,
-    ),
-    /// Should be returned from [`SupplyChainAction::PutUpForSaleByProducer`].
-    ForSaleByProducer(
-        /// An ID of an item put up for sale to a distributor.
-        ItemId,
-    ),
-    /// Should be returned from [`SupplyChainAction::PurchaseByDistributor`].
-    PurchasedByDistributor(
-        /// An ID of an item purchased by a distributor.
-        ItemId,
-    ),
-    /// Should be returned from [`SupplyChainAction::ApproveByProducer`].
-    ApprovedByProducer(
-        /// An ID of an item approved or not for a distributor's purchase.
-        ItemId,
-    ),
-    /// Should be returned from [`SupplyChainAction::ShipByProducer`].
-    ShippedByProducer(
-        /// An ID of an item shipped by a producer.
-        ItemId,
-    ),
-    /// Should be returned from [`SupplyChainAction::ReceiveByDistributor`].
-    ReceivedByDistributor(
-        /// An ID of an item received by a distributor.
-        ItemId,
-    ),
-    /// Should be returned from [`SupplyChainAction::ProcessByDistributor`].
-    ProcessedByDistributor(
-        /// An ID of an item processed by a distributor.
-        ItemId,
-    ),
-    /// Should be returned from [`SupplyChainAction::PackageByDistributor`].
-    PackagedByDistributor(
-        /// An ID of an item packaged by a distributor.
-        ItemId,
-    ),
-    /// Should be returned from [`SupplyChainAction::PutUpForSaleByDistributor`].
-    ForSaleByDistributor(
-        /// An ID of an item put up for sale to a retailer.
-        ItemId,
-    ),
-    /// Should be returned from [`SupplyChainAction::PurchaseByRetailer`].
-    PurchasedByRetailer(
-        /// An ID of an item purchased by a retailer.
-        ItemId,
-    ),
-    /// Should be returned from [`SupplyChainAction::ApproveByDistributor`].
-    ApprovedByDistributor(
-        /// An ID of an item approved or not for a retailer's purchase.
-        ItemId,
-    ),
-    /// Should be returned from [`SupplyChainAction::ShipByDistributor`].
-    ShippedByDistributor(
-        /// An ID of an item shipped by a distributor.
-        ItemId,
-    ),
-    /// Should be returned from [`SupplyChainAction::ReceiveByRetailer`].
-    ReceivedByRetailer(
-        /// An ID of an item received by a retailer.
-        ItemId,
-    ),
-    /// Should be returned from [`SupplyChainAction::PutUpForSaleByRetailer`].
-    ForSaleByRetailer(
-        /// An ID of an item put up for sale to a consumer.
-        ItemId,
-    ),
-    /// Should be returned from [`SupplyChainAction::PurchaseByConsumer`].
-    PurchasedByConsumer(
-        /// An ID of an item purchased by a consumer.
-        ItemId,
-    ),
+#[derive(Encode, Decode, TypeInfo, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+pub struct SupplyChainEvent {
+    pub item_id: ItemId,
+    pub item_state: ItemState,
+}
+
+/// Roles of supply chain participants.
+#[derive(Encode, Decode, TypeInfo, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+pub enum Role {
+    Producer,
+    Distributor,
+    Retailer,
+    #[default]
+    Consumer,
 }
 
 /// Queries a program state.
 ///
 /// On failure, returns a [`Default`] value.
-#[derive(Encode, Decode, TypeInfo)]
+#[derive(Encode, Decode, TypeInfo, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum SupplyChainStateQuery {
-    /// Queries [`ItemInfo`].
-    ///
-    /// Returns [`SupplyChainStateReply::ItemInfo`].
     ItemInfo(ItemId),
-
-    /// Queries supply chain [`Participants`].
-    ///
-    /// Returns [`SupplyChainStateReply::Participants`].
     Participants,
-
-    /// Queries an FT program [`ActorId`] used by a supply chain.
-    ///
-    /// Returns [`SupplyChainStateReply::FTProgram`].
-    FTProgram,
-
-    /// Queries an NFT program [`ActorId`] used by a supply chain.
-    ///
-    /// Returns [`SupplyChainStateReply::NFTProgram`].
-    NFTProgram,
-
-    /// Queries [`ItemId`] & [`ItemInfo`] of all items that exist in a supply chain.
-    ///
-    /// Returns [`SupplyChainStateReply::ExistingItems`].
-    ExistingItems,
-
-    /// Queries [`Role`]s of given [`ActorId`].
-    ///
-    /// Returns [`SupplyChainStateReply::Roles`].
     Roles(ActorId),
+    ExistingItems,
+    FtContractActorId,
+    NftContractActorId,
 }
 
 /// A reply for queried [`SupplyChainStateQuery`].
-#[derive(Encode, Decode, TypeInfo)]
+#[derive(Encode, Decode, TypeInfo, Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub enum SupplyChainStateReply {
-    /// Should be returned from [`SupplyChainStateQuery::ItemInfo`].
-    ItemInfo(ItemInfo),
-    /// Should be returned from [`SupplyChainStateQuery::FTProgram`].
-    FTProgram(ActorId),
-    /// Should be returned from [`SupplyChainStateQuery::Participants`].
-    Participants(Participants),
-    /// Should be returned from [`SupplyChainStateQuery::NFTProgram`].
-    NFTProgram(ActorId),
-    /// Should be returned from [`SupplyChainStateQuery::ExistingItems`].
+    ItemInfo(Option<ItemInfo>),
+    Participants {
+        producers: BTreeSet<ActorId>,
+        distributors: BTreeSet<ActorId>,
+        retailers: BTreeSet<ActorId>,
+    },
+    FtContractActorId(ActorId),
+    NftContractActorId(ActorId),
     ExistingItems(BTreeMap<ItemId, ItemInfo>),
-    /// Should be returned from [`SupplyChainStateQuery::Roles`].
     Roles(BTreeSet<Role>),
 }
 
-/// Roles of supply chain [`Participants`].
-///
-/// Can be queried by [`SupplyChainStateQuery::Roles`].
-#[derive(Encode, Decode, TypeInfo, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub enum Role {
-    Producer,
-    Distributor,
-    Retailer,
-}
-
 /// Item info.
-///
-/// Can be queried by [`SupplyChainStateQuery::ItemInfo`].
-#[derive(Encode, Decode, Clone, Copy, TypeInfo, Default, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Encode, Decode, TypeInfo, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub struct ItemInfo {
-    /// Item's producer [`ActorId`].
+    /// Item’s producer [`ActorId`].
     pub producer: ActorId,
-    /// [`ActorId`] of an item's current or past distributor (depends on item's
-    /// state`). If it equals [`ActorId::zero()`], then it means that an item
+    /// [`ActorId`] of an item’s current or past distributor (depends on item’s
+    /// `state`). If it equals [`ActorId::zero()`], then it means that an item
     /// has never had a distributor.
     pub distributor: ActorId,
-    /// [`ActorId`] of an item's current or past retailer (depends on item's
+    /// [`ActorId`] of an item’s current or past retailer (depends on item’s
     /// `state`). If it equals [`ActorId::zero()`], then it means that an item
     /// has never had a retailer.
     pub retailer: ActorId,
 
     pub state: ItemState,
-    /// An item's price. If it equals 0, then, depending on item's `state`, an
+    /// An item’s price. If it equals 0, then, depending on item’s `state`, an
     /// item is sold for free or has never been put up for sale.
     pub price: u128,
     /// Milliseconds during which a current seller should deliver an item.
     pub delivery_time: u64,
 }
 
-/// An item's state.
-#[derive(Encode, Decode, PartialEq, Eq, Clone, Copy, Debug, TypeInfo, Default, PartialOrd, Ord)]
-pub enum ItemState {
-    #[default]
-    Produced,
-    ForSaleByProducer,
-    PurchasedByDistributor,
-    ApprovedByProducer,
-    ShippedByProducer,
-    ReceivedByDistributor,
-    ProcessedByDistributor,
-    PackagedByDistributor,
-    ForSaleByDistributor,
-    PurchasedByRetailer,
-    ApprovedByDistributor,
-    ShippedByDistributor,
-    ReceivedByRetailer,
-    ForSaleByRetailer,
-    PurchasedByConsumer,
+/// An item’s state.
+#[derive(Encode, Decode, TypeInfo, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+pub struct ItemState {
+    pub state: ItemEventState,
+    pub by: Role,
 }
 
-#[derive(TypeInfo, Encode, Decode, PartialEq, Eq, Debug)]
-/// Supply chain participants.
-pub struct Participants {
-    /// IDs of actors that have the right to interact with a supply chain on
-    /// behalf of a producer.
-    pub producers: BTreeSet<ActorId>,
-    /// IDs of actors that have the right to interact with a supply chain on
-    /// behalf of a distributor.
-    pub distributors: BTreeSet<ActorId>,
-    /// IDs of actors that have the right to interact with a supply chain on
-    /// behalf of a retailer.
-    pub retailers: BTreeSet<ActorId>,
+/// A part of [`ItemState`].
+#[derive(Encode, Decode, TypeInfo, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+pub enum ItemEventState {
+    #[default]
+    Produced,
+    Purchased,
+    Received,
+    Processed,
+    Packaged,
+    ForSale,
+    Approved,
+    Shipped,
 }
