@@ -704,7 +704,7 @@ async fn main() {
         }
     };
 
-    msg::reply(event, 0).expect("Failed to reply or encode `SupplyChainEvent`");
+    msg::reply(event, 0).expect("Failed to encode or reply with `SupplyChainEvent`");
 }
 
 #[no_mangle]
