@@ -122,7 +122,7 @@ impl SupplyChain {
     ) -> SupplyChainEvent {
         let item_id = utils::mint_nft(transaction_id, self.nft_actor_id, token_metadata).await;
 
-        utils::transfer_nft(transaction_id + 1, self.nft_actor_id, msg_source, item_id).await;
+        utils::transfer_nft(transaction_id, self.nft_actor_id, msg_source, item_id).await;
 
         self.items.insert(
             item_id,
