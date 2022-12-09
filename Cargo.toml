@@ -17,6 +17,15 @@ scale-info = { version = "2", default-features = false }
 [dev-dependencies]
 gtest = { git = "https://github.com/gear-tech/gear.git", branch = "stable" }
 gstd = { git = "https://github.com/gear-tech/gear.git", branch = "stable", features = ["debug"] }
+gclient = { git = "https://github.com/gear-tech/gear.git", branch = "stable", default-features = false }
+sp-core-hashing = { git = "https://github.com/gear-tech/substrate.git", branch = "gear-stable" }
+subxt = { version = "0.24", default-features = false }
+primitive-types = "0.12"
+tokio = "1"
 
 [build-dependencies]
 gear-wasm-builder = { git = "https://github.com/gear-tech/gear.git", branch = "stable" }
+
+[patch.crates-io]
+sp-core = { git = "https://github.com/gear-tech/substrate.git", branch = "gear-stable" }
+sp-runtime = { git = "https://github.com/gear-tech/substrate.git", branch = "gear-stable" }

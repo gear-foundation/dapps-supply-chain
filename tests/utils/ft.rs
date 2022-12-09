@@ -22,9 +22,9 @@ impl TransactionProgram for Sft<'_> {
 
 impl<'a> Sft<'a> {
     pub fn initialize(system: &'a System) -> Self {
-        let program = InnerProgram::from_file(system, "target/ft_main.opt.wasm");
-        let storage_code: [u8; 32] = system.submit_code("target/ft_storage.opt.wasm").into();
-        let logic_code: [u8; 32] = system.submit_code("target/ft_logic.opt.wasm").into();
+        let program = InnerProgram::from_file(system, "target/ft_main.wasm");
+        let storage_code: [u8; 32] = system.submit_code("target/ft_storage.wasm").into();
+        let logic_code: [u8; 32] = system.submit_code("target/ft_logic.wasm").into();
 
         assert!(!program
             .send(

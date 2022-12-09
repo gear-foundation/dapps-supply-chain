@@ -12,10 +12,10 @@ fn ownership_and_role() {
     let system = utils::initialize_system();
 
     let nft = NonFungibleToken::initialize(&system);
-    let mut sft = Sft::initialize(&system);
+    let mut ft = Sft::initialize(&system);
 
     for from in [DISTRIBUTOR[0], RETAILER[0]] {
-        sft.mint(from, ITEM_PRICE);
+        ft.mint(from, ITEM_PRICE);
     }
 
     let supply_chain = SupplyChain::initialize_custom(
@@ -25,14 +25,14 @@ fn ownership_and_role() {
             distributors: [DISTRIBUTOR[0].into(), DISTRIBUTOR[1].into()].into(),
             retailers: [RETAILER[0].into(), RETAILER[1].into()].into(),
 
-            ft_actor_id: sft.actor_id(),
+            ft_actor_id: ft.actor_id(),
             nft_actor_id: nft.actor_id(),
         },
     )
     .succeed();
 
     for from in [DISTRIBUTOR[0], RETAILER[0]] {
-        sft.approve(from, supply_chain.actor_id(), ITEM_PRICE);
+        ft.approve(from, supply_chain.actor_id(), ITEM_PRICE);
     }
 
     // Should fail because `msg::source()` must be a producer.
@@ -161,7 +161,7 @@ fn ownership_and_role() {
 fn query_roles() {
     let system = utils::initialize_system();
 
-    let sft = Sft::initialize(&system);
+    let ft = Sft::initialize(&system);
     let nft = NonFungibleToken::initialize(&system);
 
     let mut supply_chain = SupplyChain::initialize_custom(
@@ -171,7 +171,7 @@ fn query_roles() {
             distributors: [FOREIGN_USER.into()].into(),
             retailers: [FOREIGN_USER.into()].into(),
 
-            ft_actor_id: sft.actor_id(),
+            ft_actor_id: ft.actor_id(),
             nft_actor_id: nft.actor_id(),
         },
     )
@@ -191,7 +191,7 @@ fn query_roles() {
             distributors: [].into(),
             retailers: [].into(),
 
-            ft_actor_id: sft.actor_id(),
+            ft_actor_id: ft.actor_id(),
             nft_actor_id: nft.actor_id(),
         },
     )

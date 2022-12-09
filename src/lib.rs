@@ -48,6 +48,7 @@ fn role_to_get_item_pdr(role: Role) -> fn(&Item) -> ActorId {
     FNS[role as usize]
 }
 
+#[derive(Default)]
 struct Item {
     info: ItemInfo,
     shipping_time: u64,
@@ -121,31 +122,22 @@ impl SupplyChain {
     ) -> SupplyChainEvent {
         let item_id = utils::mint_nft(transaction_id, self.nft_actor_id, token_metadata).await;
 
-        utils::transfer_nft(transaction_id, self.nft_actor_id, msg_source, item_id).await;
-
-        let item_state = ItemState {
-            state: Default::default(),
-            by: Role::Producer,
-        };
+        utils::transfer_nft(transaction_id + 1, self.nft_actor_id, msg_source, item_id).await;
 
         self.items.insert(
             item_id,
             Item {
                 info: ItemInfo {
                     producer: msg_source,
-                    state: item_state,
-                    distributor: Default::default(),
-                    retailer: Default::default(),
-                    price: Default::default(),
-                    delivery_time: Default::default(),
+                    ..Default::default()
                 },
-                shipping_time: Default::default(),
+                ..Default::default()
             },
         );
 
         SupplyChainEvent {
             item_id,
-            item_state,
+            item_state: Default::default(),
         }
     }
 

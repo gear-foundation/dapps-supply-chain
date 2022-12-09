@@ -4,14 +4,14 @@ use gtest::{Program as InnerProgram, System};
 use supply_chain::*;
 
 mod common;
+mod ft;
 mod nft;
-mod sft;
 
 pub mod prelude;
 
 pub use common::initialize_system;
+pub use ft::Sft;
 pub use nft::NonFungibleToken;
-pub use sft::Sft;
 
 pub const FOREIGN_USER: u64 = 1029384756123;
 pub const PRODUCER: u64 = 5;

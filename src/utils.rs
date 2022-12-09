@@ -5,6 +5,7 @@ use gear_lib::non_fungible_token::{
     token::{TokenId, TokenMetadata},
 };
 use gstd::{
+    debug,
     errors::ContractError,
     msg::{self, CodecMessageFuture},
     prelude::*,
@@ -20,12 +21,11 @@ fn send<T: Decode>(
 }
 
 fn nft_event_to_nft_transfer(nft_event: Result<NFTEvent, ContractError>) -> NFTTransfer {
-    if let NFTEvent::Transfer(nft_transfer) =
-        nft_event.expect("Failed to load or decode `NFTEvent::Transfer`")
-    {
+    let nft_event = nft_event.expect("Failed to load or decode `NFTEvent::Transfer`");
+    if let NFTEvent::Transfer(nft_transfer) = nft_event {
         nft_transfer
     } else {
-        panic!("Received an unexpected `NFTEvent` variant");
+        panic!("Received an unexpected `NFTEvent` variant: {:?}", nft_event);
     }
 }
 

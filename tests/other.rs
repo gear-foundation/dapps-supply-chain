@@ -8,9 +8,9 @@ fn interact_with_unexistent_item() {
 
     let system = utils::initialize_system();
 
-    let sft = Sft::initialize(&system);
+    let ft = Sft::initialize(&system);
     let nft = NonFungibleToken::initialize(&system);
-    let supply_chain = SupplyChain::initialize(&system, sft.actor_id(), nft.actor_id());
+    let supply_chain = SupplyChain::initialize(&system, ft.actor_id(), nft.actor_id());
 
     // Should fail because an item must exist in a supply chain.
     supply_chain
@@ -78,7 +78,7 @@ fn interact_with_unexistent_item() {
 fn initialization() {
     let system = utils::initialize_system();
 
-    let sft = Sft::initialize(&system);
+    let ft = Sft::initialize(&system);
     let nft = NonFungibleToken::initialize(&system);
 
     let mut supply_chain_config = SupplyChainInit {
@@ -86,7 +86,7 @@ fn initialization() {
         distributors: [ActorId::zero()].into(),
         retailers: [ActorId::zero()].into(),
 
-        ft_actor_id: sft.actor_id(),
+        ft_actor_id: ft.actor_id(),
         nft_actor_id: nft.actor_id(),
     };
     // Should fail because each [`ActorId`] of `producers`, `distributors`, and
@@ -115,7 +115,7 @@ fn initialization() {
             distributors: supply_chain_config.distributors,
             retailers: supply_chain_config.retailers,
         });
-    supply_chain.meta_state().ft_program().eq(sft.actor_id());
+    supply_chain.meta_state().ft_program().eq(ft.actor_id());
     supply_chain.meta_state().nft_program().eq(nft.actor_id());
 }
 
@@ -123,9 +123,9 @@ fn initialization() {
 fn query_existing_items() {
     let system = utils::initialize_system();
 
-    let sft = Sft::initialize(&system);
+    let ft = Sft::initialize(&system);
     let nft = NonFungibleToken::initialize(&system);
-    let supply_chain = SupplyChain::initialize(&system, sft.actor_id(), nft.actor_id());
+    let supply_chain = SupplyChain::initialize(&system, ft.actor_id(), nft.actor_id());
 
     let mut items_info = BTreeMap::new();
 

@@ -410,7 +410,7 @@ pub enum SupplyChainStateReply {
 }
 
 /// Item info.
-#[derive(Encode, Decode, TypeInfo, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+#[derive(Encode, Decode, TypeInfo, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub struct ItemInfo {
     /// Item’s producer [`ActorId`].
     pub producer: ActorId,
@@ -436,6 +436,15 @@ pub struct ItemInfo {
 pub struct ItemState {
     pub state: ItemEventState,
     pub by: Role,
+}
+
+impl Default for ItemState {
+    fn default() -> Self {
+        Self {
+            state: Default::default(),
+            by: Role::Producer,
+        }
+    }
 }
 
 /// A part of [`ItemState`].

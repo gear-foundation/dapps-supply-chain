@@ -10,15 +10,15 @@ fn approve_reuse_and_ft_transfer() {
     let system = utils::initialize_system();
 
     let nft = NonFungibleToken::initialize(&system);
-    let mut sft = Sft::initialize(&system);
-    let supply_chain = SupplyChain::initialize(&system, sft.actor_id(), nft.actor_id());
+    let mut ft = Sft::initialize(&system);
+    let supply_chain = SupplyChain::initialize(&system, ft.actor_id(), nft.actor_id());
 
     for (from, amount) in [
         (DISTRIBUTOR, ITEM_PRICE_BY_PRODUCER),
         (RETAILER, ITEM_PRICE_BY_DISTRIBUTOR),
     ] {
-        sft.mint(from, amount);
-        sft.approve(from, supply_chain.actor_id(), amount * 2);
+        ft.mint(from, amount);
+        ft.approve(from, supply_chain.actor_id(), amount * 2);
     }
 
     supply_chain.produce(PRODUCER).contains(0);
@@ -35,20 +35,20 @@ fn approve_reuse_and_ft_transfer() {
     supply_chain
         .purchase_by_distributor(DISTRIBUTOR, 0, DELIVERY_TIME)
         .contains(0);
-    sft.balance(supply_chain.actor_id())
+    ft.balance(supply_chain.actor_id())
         .contains(ITEM_PRICE_BY_PRODUCER);
     // Then the seller can cancel this purchase and put its item back up for
     // sale.
     supply_chain
         .approve_by_producer(PRODUCER, 0, false)
         .contains((0, false));
-    sft.balance(DISTRIBUTOR).contains(ITEM_PRICE_BY_PRODUCER);
+    ft.balance(DISTRIBUTOR).contains(ITEM_PRICE_BY_PRODUCER);
     // Thereafter the same buyer or another can purchase this item again and put
     // a more convenient delivery time for the seller...
     supply_chain
         .purchase_by_distributor(DISTRIBUTOR, 0, DELIVERY_TIME)
         .contains(0);
-    sft.balance(supply_chain.actor_id())
+    ft.balance(supply_chain.actor_id())
         .contains(ITEM_PRICE_BY_PRODUCER);
     // ...who will approve this purchase and ship the item later.
     supply_chain
@@ -74,20 +74,20 @@ fn approve_reuse_and_ft_transfer() {
     supply_chain
         .purchase_by_retailer(RETAILER, 0, DELIVERY_TIME)
         .contains(0);
-    sft.balance(supply_chain.actor_id())
+    ft.balance(supply_chain.actor_id())
         .contains(ITEM_PRICE_BY_DISTRIBUTOR);
     // Then the seller can cancel this purchase and put its item back up for
     // sale.
     supply_chain
         .approve_by_distributor(DISTRIBUTOR, 0, false)
         .contains((0, false));
-    sft.balance(RETAILER).contains(ITEM_PRICE_BY_DISTRIBUTOR);
+    ft.balance(RETAILER).contains(ITEM_PRICE_BY_DISTRIBUTOR);
     // Thereafter the same buyer or another can purchase this item again and put
     // a more convenient delivery time for the seller...
     supply_chain
         .purchase_by_retailer(RETAILER, 0, DELIVERY_TIME)
         .contains(0);
-    sft.balance(supply_chain.actor_id())
+    ft.balance(supply_chain.actor_id())
         .contains(ITEM_PRICE_BY_DISTRIBUTOR);
     // ...who will approve this purchase and ship the item later.
     supply_chain
