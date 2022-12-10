@@ -122,7 +122,7 @@ impl SupplyChain {
     ) -> SupplyChainEvent {
         let item_id = utils::mint_nft(transaction_id, self.nft_actor_id, token_metadata).await;
 
-        utils::transfer_nft(transaction_id, self.nft_actor_id, msg_source, item_id).await;
+        utils::transfer_nft(transaction_id + 1, self.nft_actor_id, msg_source, item_id).await;
 
         self.items.insert(
             item_id,
@@ -380,13 +380,13 @@ impl<T> Default for TransactionManager<T> {
 }
 
 impl<T: Ord + Clone> TransactionManager<T> {
-    fn asquire_transaction<'a>(&'a mut self, key: &'a T) -> TransactionGuard<T> {
+    fn asquire_transactions<'a>(&'a mut self, key: &'a T, amount: u64) -> TransactionGuard<T> {
         let transaction_id = if let Some(id) = self.transactions.get(key) {
             *id
         } else {
             let id = self.transaction_id_nonce;
 
-            self.transaction_id_nonce = self.transaction_id_nonce.wrapping_add(1);
+            self.transaction_id_nonce = self.transaction_id_nonce.wrapping_add(amount);
             self.transactions.insert(key.clone(), id);
 
             id
@@ -397,6 +397,10 @@ impl<T: Ord + Clone> TransactionManager<T> {
             key,
             transaction_id,
         }
+    }
+
+    fn asquire_transaction<'a>(&'a mut self, key: &'a T) -> TransactionGuard<T> {
+        self.asquire_transactions(key, 1)
     }
 }
 
@@ -521,7 +525,7 @@ async fn main() {
                             token_metadata: token_metadata.clone(),
                         }),
                     );
-                    let transaction_guard = transaction_manager.asquire_transaction(&key);
+                    let transaction_guard = transaction_manager.asquire_transactions(&key, 2);
 
                     supply_chain
                         .produce(msg_source, transaction_guard.transaction_id, token_metadata)
@@ -588,7 +592,7 @@ async fn main() {
                         .await
                 }
                 DistributorAction::Receive(item_id) => {
-                    let transaction_guard = transaction_manager.asquire_transaction(&key);
+                    let transaction_guard = transaction_manager.asquire_transactions(&key, 2);
 
                     supply_chain
                         .receive(
@@ -651,13 +655,14 @@ async fn main() {
             }
 
             let key = (msg_source, contract_action);
-            let transaction_guard = transaction_manager.asquire_transaction(&key);
 
             match action {
                 RetailerAction::Purchase {
                     item_id,
                     delivery_time,
                 } => {
+                    let transaction_guard = transaction_manager.asquire_transaction(&key);
+
                     supply_chain
                         .purchase(
                             msg_source,
@@ -670,6 +675,8 @@ async fn main() {
                         .await
                 }
                 RetailerAction::Receive(item_id) => {
+                    let transaction_guard = transaction_manager.asquire_transactions(&key, 2);
+
                     supply_chain
                         .receive(
                             msg_source,
@@ -681,6 +688,8 @@ async fn main() {
                         .await
                 }
                 RetailerAction::PutUpForSale { item_id, price } => {
+                    let transaction_guard = transaction_manager.asquire_transaction(&key);
+
                     supply_chain
                         .put_up_for_sale(
                             msg_source,

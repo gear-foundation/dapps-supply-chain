@@ -5,7 +5,6 @@ use gear_lib::non_fungible_token::{
     token::{TokenId, TokenMetadata},
 };
 use gstd::{
-    debug,
     errors::ContractError,
     msg::{self, CodecMessageFuture},
     prelude::*,
@@ -21,11 +20,12 @@ fn send<T: Decode>(
 }
 
 fn nft_event_to_nft_transfer(nft_event: Result<NFTEvent, ContractError>) -> NFTTransfer {
-    let nft_event = nft_event.expect("Failed to load or decode `NFTEvent::Transfer`");
-    if let NFTEvent::Transfer(nft_transfer) = nft_event {
+    if let NFTEvent::Transfer(nft_transfer) =
+        nft_event.expect("Failed to load or decode `NFTEvent::Transfer`")
+    {
         nft_transfer
     } else {
-        panic!("Received an unexpected `NFTEvent` variant: {:?}", nft_event);
+        panic!("Received an unexpected `NFTEvent` variant");
     }
 }
 
@@ -75,22 +75,21 @@ pub async fn transfer_ftokens(
     recipient: ActorId,
     amount: u128,
 ) {
+    let payload = FTokenAction::Message {
+        transaction_id,
+        payload: Action::Transfer {
+            sender,
+            recipient,
+            amount,
+        }
+        .encode(),
+    };
+
     if FTokenEvent::Ok
-        != send(
-            ft_actor_id,
-            FTokenAction::Message {
-                transaction_id,
-                payload: Action::Transfer {
-                    sender,
-                    recipient,
-                    amount,
-                }
-                .encode(),
-            },
-        )
-        .expect("Failed to encode or send `FTokenAction::Message`")
-        .await
-        .expect("Failed to load or decode `FTokenEvent`")
+        != send(ft_actor_id, payload)
+            .expect("Failed to encode or send `FTokenAction::Message`")
+            .await
+            .expect("Failed to load or decode `FTokenEvent`")
     {
         panic!("Received an unexpected `FTokenEvent` variant");
     }
