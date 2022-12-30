@@ -1,4 +1,4 @@
-use utils::{prelude::*, NonFungibleToken, Sft};
+use utils::{prelude::*, FungibleToken, NonFungibleToken};
 
 pub mod utils;
 
@@ -6,62 +6,87 @@ pub mod utils;
 fn nft_transfer() {
     let system = utils::initialize_system();
 
-    let nft = NonFungibleToken::initialize(&system);
-    let mut ft = Sft::initialize(&system);
-    let supply_chain = SupplyChain::initialize(&system, ft.actor_id(), nft.actor_id());
+    let non_fungible_token = NonFungibleToken::initialize(&system);
+    let mut fungible_token = FungibleToken::initialize(&system);
+    let mut supply_chain = SupplyChain::initialize(
+        &system,
+        fungible_token.actor_id(),
+        non_fungible_token.actor_id(),
+    );
 
     for from in [DISTRIBUTOR, RETAILER, CONSUMER] {
-        ft.mint(from, ITEM_PRICE);
-        ft.approve(from, supply_chain.actor_id(), ITEM_PRICE);
+        fungible_token.mint(from, ITEM_PRICE);
+        fungible_token.approve(from, supply_chain.actor_id(), ITEM_PRICE);
     }
 
-    supply_chain.produce(PRODUCER).contains(0);
-    nft.meta_state().owner_id(0).eq(PRODUCER.into());
+    supply_chain.produce(PRODUCER).succeed(0);
+    non_fungible_token
+        .meta_state()
+        .owner_id(0)
+        .eq(PRODUCER.into());
 
     supply_chain
         .put_up_for_sale_by_producer(PRODUCER, 0, ITEM_PRICE)
-        .contains(0);
-    nft.meta_state().owner_id(0).eq(supply_chain.actor_id());
+        .succeed(0);
+    non_fungible_token
+        .meta_state()
+        .owner_id(0)
+        .eq(supply_chain.actor_id());
 
     supply_chain
         .purchase_by_distributor(DISTRIBUTOR, 0, DELIVERY_TIME)
-        .contains(0);
+        .succeed(0);
     supply_chain
         .approve_by_producer(PRODUCER, 0, true)
-        .contains((0, true));
-    supply_chain.ship_by_producer(PRODUCER, 0).contains(0);
+        .succeed((0, true));
+    supply_chain.ship_by_producer(PRODUCER, 0).succeed(0);
 
     supply_chain
         .receive_by_distributor(DISTRIBUTOR, 0)
-        .contains(0);
-    nft.meta_state().owner_id(0).eq(DISTRIBUTOR.into());
+        .succeed(0);
+    non_fungible_token
+        .meta_state()
+        .owner_id(0)
+        .eq(DISTRIBUTOR.into());
 
-    supply_chain.process(DISTRIBUTOR, 0).contains(0);
-    supply_chain.package(DISTRIBUTOR, 0).contains(0);
+    supply_chain.process(DISTRIBUTOR, 0).succeed(0);
+    supply_chain.package(DISTRIBUTOR, 0).succeed(0);
 
     supply_chain
         .put_up_for_sale_by_distributor(DISTRIBUTOR, 0, ITEM_PRICE)
-        .contains(0);
-    nft.meta_state().owner_id(0).eq(supply_chain.actor_id());
+        .succeed(0);
+    non_fungible_token
+        .meta_state()
+        .owner_id(0)
+        .eq(supply_chain.actor_id());
 
     supply_chain
         .purchase_by_retailer(RETAILER, 0, DELIVERY_TIME)
-        .contains(0);
+        .succeed(0);
     supply_chain
         .approve_by_distributor(DISTRIBUTOR, 0, true)
-        .contains((0, true));
-    supply_chain.ship_by_distributor(DISTRIBUTOR, 0).contains(0);
+        .succeed((0, true));
+    supply_chain.ship_by_distributor(DISTRIBUTOR, 0).succeed(0);
 
-    supply_chain.receive_by_retailer(RETAILER, 0).contains(0);
-    nft.meta_state().owner_id(0).eq(RETAILER.into());
+    supply_chain.receive_by_retailer(RETAILER, 0).succeed(0);
+    non_fungible_token
+        .meta_state()
+        .owner_id(0)
+        .eq(RETAILER.into());
 
     supply_chain
         .put_up_for_sale_by_retailer(RETAILER, 0, ITEM_PRICE)
-        .contains(0);
-    nft.meta_state().owner_id(0).eq(supply_chain.actor_id());
+        .succeed(0);
+    non_fungible_token
+        .meta_state()
+        .owner_id(0)
+        .eq(supply_chain.actor_id());
 
-    supply_chain.purchase_by_consumer(CONSUMER, 0).contains(0);
-    nft.meta_state().owner_id(0).eq(CONSUMER.into());
+    supply_chain.purchase_by_consumer(CONSUMER, 0).succeed(0);
+    non_fungible_token
+        .meta_state()
+        .owner_id(0)
+        .eq(CONSUMER.into());
 
     supply_chain.meta_state().item_info(0).eq(Some(ItemInfo {
         producer: PRODUCER.into(),
@@ -75,5 +100,8 @@ fn nft_transfer() {
         price: ITEM_PRICE,
         delivery_time: DELIVERY_TIME,
     }));
-    nft.meta_state().owner_id(0).eq(CONSUMER.into())
+    non_fungible_token
+        .meta_state()
+        .owner_id(0)
+        .eq(CONSUMER.into())
 }

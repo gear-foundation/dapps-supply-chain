@@ -1,4 +1,4 @@
-use utils::{prelude::*, NonFungibleToken, Sft};
+use utils::{prelude::*, FungibleToken, NonFungibleToken};
 
 pub mod utils;
 
@@ -6,113 +6,105 @@ pub mod utils;
 fn state() {
     let system = utils::initialize_system();
 
-    let nft = NonFungibleToken::initialize(&system);
-    let mut ft = Sft::initialize(&system);
-    let supply_chain = SupplyChain::initialize(&system, ft.actor_id(), nft.actor_id());
+    let non_fungible_token = NonFungibleToken::initialize(&system);
+    let mut fungible_token = FungibleToken::initialize(&system);
+    let mut supply_chain = SupplyChain::initialize(
+        &system,
+        fungible_token.actor_id(),
+        non_fungible_token.actor_id(),
+    );
 
     for from in [DISTRIBUTOR, RETAILER, CONSUMER] {
-        // Double the balances to catch bugs.
-        ft.mint(from, ITEM_PRICE * 2);
-        ft.approve(from, supply_chain.actor_id(), ITEM_PRICE * 2);
+        // Double balances to catch bugs.
+        fungible_token.mint(from, ITEM_PRICE * 2);
+        fungible_token.approve(from, supply_chain.actor_id(), ITEM_PRICE * 2);
     }
 
-    supply_chain.produce(PRODUCER).contains(0);
+    supply_chain.produce(PRODUCER).succeed(0);
 
     supply_chain
         .put_up_for_sale_by_producer(PRODUCER, 0, ITEM_PRICE)
-        .contains(0);
-    // Should fail because item's `ItemState` must contain
-    // `ItemEventState::Produced` & `Role::Producer`.
+        .succeed(0);
     supply_chain
         .put_up_for_sale_by_producer(PRODUCER, 0, ITEM_PRICE)
-        .failed();
+        .failed(SupplyChainError::UnexpectedItemState);
 
     supply_chain
         .purchase_by_distributor(DISTRIBUTOR, 0, DELIVERY_TIME)
-        .contains(0);
-    // Should fail because item's `ItemState` must contain
-    // `ItemEventState::ForSale` & `Role::Producer`.
+        .succeed(0);
     supply_chain
         .purchase_by_distributor(DISTRIBUTOR, 0, DELIVERY_TIME)
-        .failed();
+        .failed(SupplyChainError::UnexpectedItemState);
 
     supply_chain
         .approve_by_producer(PRODUCER, 0, true)
-        .contains((0, true));
-    // Should fail because item's `ItemState` must contain
-    // `ItemEventState::Purchased` & `Role::Distributor`.
-    supply_chain.approve_by_producer(PRODUCER, 0, true).failed();
+        .succeed((0, true));
+    supply_chain
+        .approve_by_producer(PRODUCER, 0, true)
+        .failed(SupplyChainError::UnexpectedItemState);
 
-    supply_chain.ship_by_producer(PRODUCER, 0).contains(0);
-    // Should fail because item's `ItemState` must contain
-    // `ItemEventState::Approved` & `Role::Producer`.
-    supply_chain.ship_by_producer(PRODUCER, 0).failed();
+    supply_chain.ship_by_producer(PRODUCER, 0).succeed(0);
+    supply_chain
+        .ship_by_producer(PRODUCER, 0)
+        .failed(SupplyChainError::UnexpectedItemState);
 
     supply_chain
         .receive_by_distributor(DISTRIBUTOR, 0)
-        .contains(0);
-    // Should fail because item's `ItemState` must contain
-    // `ItemEventState::Shipped` & `Role::Producer`.
-    supply_chain.receive_by_distributor(DISTRIBUTOR, 0).failed();
+        .succeed(0);
+    supply_chain
+        .receive_by_distributor(DISTRIBUTOR, 0)
+        .failed(SupplyChainError::UnexpectedItemState);
 
-    supply_chain.process(DISTRIBUTOR, 0).contains(0);
-    // Should fail because item's `ItemState` must contain
-    // `ItemEventState::Received` & `Role::Distributor`.
-    supply_chain.process(DISTRIBUTOR, 0).failed();
+    supply_chain.process(DISTRIBUTOR, 0).succeed(0);
+    supply_chain
+        .process(DISTRIBUTOR, 0)
+        .failed(SupplyChainError::UnexpectedItemState);
 
-    supply_chain.package(DISTRIBUTOR, 0).contains(0);
-    // Should fail because item's `ItemState` must contain
-    // `ItemEventState::Processed` & `Role::Distributor`.
-    supply_chain.package(DISTRIBUTOR, 0).failed();
+    supply_chain.package(DISTRIBUTOR, 0).succeed(0);
+    supply_chain
+        .package(DISTRIBUTOR, 0)
+        .failed(SupplyChainError::UnexpectedItemState);
 
     supply_chain
         .put_up_for_sale_by_distributor(DISTRIBUTOR, 0, ITEM_PRICE)
-        .contains(0);
-    // Should fail because item's `ItemState` must contain
-    // `ItemEventState::Packaged` & `Role::Distributor`.
+        .succeed(0);
     supply_chain
         .put_up_for_sale_by_distributor(DISTRIBUTOR, 0, ITEM_PRICE)
-        .failed();
+        .failed(SupplyChainError::UnexpectedItemState);
 
     supply_chain
         .purchase_by_retailer(RETAILER, 0, DELIVERY_TIME)
-        .contains(0);
-    // Should fail because item's `ItemState` must contain
-    // `ItemEventState::ForSale` & `Role::Distributor`.
+        .succeed(0);
     supply_chain
         .purchase_by_retailer(RETAILER, 0, DELIVERY_TIME)
-        .failed();
+        .failed(SupplyChainError::UnexpectedItemState);
 
     supply_chain
         .approve_by_distributor(DISTRIBUTOR, 0, true)
-        .contains((0, true));
-    // Should fail because item's `ItemState` must contain
-    // `ItemEventState::Purchased` & `Role::Retailer`.
+        .succeed((0, true));
     supply_chain
         .approve_by_distributor(DISTRIBUTOR, 0, true)
-        .failed();
+        .failed(SupplyChainError::UnexpectedItemState);
 
-    supply_chain.ship_by_distributor(DISTRIBUTOR, 0).contains(0);
-    // Should fail because item's `ItemState` must contain
-    // `ItemEventState::Approved` & `Role::Distributor`.
-    supply_chain.ship_by_distributor(DISTRIBUTOR, 0).failed();
+    supply_chain.ship_by_distributor(DISTRIBUTOR, 0).succeed(0);
+    supply_chain
+        .ship_by_distributor(DISTRIBUTOR, 0)
+        .failed(SupplyChainError::UnexpectedItemState);
 
-    supply_chain.receive_by_retailer(RETAILER, 0).contains(0);
-    // Should fail because item's `ItemState` must contain
-    // `ItemEventState::Shipped` & `Role::Distributor`.
-    supply_chain.receive_by_retailer(RETAILER, 0).failed();
+    supply_chain.receive_by_retailer(RETAILER, 0).succeed(0);
+    supply_chain
+        .receive_by_retailer(RETAILER, 0)
+        .failed(SupplyChainError::UnexpectedItemState);
 
     supply_chain
         .put_up_for_sale_by_retailer(RETAILER, 0, ITEM_PRICE)
-        .contains(0);
-    // Should fail because item's `ItemState` must contain
-    // `ItemEventState::Received` & `Role::Retailer`.
+        .succeed(0);
     supply_chain
         .put_up_for_sale_by_retailer(RETAILER, 0, ITEM_PRICE)
-        .failed();
+        .failed(SupplyChainError::UnexpectedItemState);
 
-    supply_chain.purchase_by_consumer(CONSUMER, 0).contains(0);
-    // Should fail because item's `ItemState` must contain
-    // `ItemEventState::ForSale` & `Role::Retailer`.
-    supply_chain.purchase_by_consumer(CONSUMER, 0).failed();
+    supply_chain.purchase_by_consumer(CONSUMER, 0).succeed(0);
+    supply_chain
+        .purchase_by_consumer(CONSUMER, 0)
+        .failed(SupplyChainError::UnexpectedItemState);
 }

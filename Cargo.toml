@@ -8,24 +8,22 @@ authors = ["Gear Technologies"]
 [dependencies]
 gstd = { git = "https://github.com/gear-tech/gear.git", branch = "stable" }
 parity-scale-codec = { version = "3", default-features = false }
-nft-io = { git = "https://github.com/gear-dapps/non-fungible-token.git", tag = "0.2.5" }
+nft-io = { git = "https://github.com/gear-dapps/non-fungible-token.git", tag = "0.2.7" }
 ft-main-io = { git = "https://github.com/gear-dapps/sharded-fungible-token.git", tag = "0.1.3" }
 ft-logic-io = { git = "https://github.com/gear-dapps/sharded-fungible-token.git", tag = "0.1.3" }
-gear-lib = { git = "https://github.com/gear-dapps/gear-lib.git", tag = "0.3.3" }
+gear-lib = { git = "https://github.com/gear-dapps/gear-lib.git", tag = "0.3.4" }
 scale-info = { version = "2", default-features = false }
+hashbrown = "0.13"
 
 [dev-dependencies]
 gtest = { git = "https://github.com/gear-tech/gear.git", branch = "stable" }
 gstd = { git = "https://github.com/gear-tech/gear.git", branch = "stable", features = ["debug"] }
-gclient = { git = "https://github.com/gear-tech/gear.git", branch = "stable", default-features = false }
-sp-core-hashing = { git = "https://github.com/gear-tech/substrate.git", branch = "gear-stable" }
-subxt = { version = "0.24", default-features = false }
+gclient = { git = "https://github.com/gear-tech/gear.git" }
+sp-core-hashing = "5"
+subxt = { version = "0.25", default-features = false }
 primitive-types = "0.12"
 tokio = "1"
+pretty_assertions = "1"
 
 [build-dependencies]
 gear-wasm-builder = { git = "https://github.com/gear-tech/gear.git", branch = "stable" }
-
-[patch.crates-io]
-sp-core = { git = "https://github.com/gear-tech/substrate.git", branch = "gear-stable" }
-sp-runtime = { git = "https://github.com/gear-tech/substrate.git", branch = "gear-stable" }

@@ -1,25 +1,25 @@
-use common::{InitResult, MetaStateReply, Program, RunResult, TransactionProgram};
+use common::{InitResult, MetaStateReply, Program, RunResult, TransactionalProgram};
 use gstd::{prelude::*, ActorId};
-use gtest::{Program as InnerProgram, System};
+use gtest::{Program as InnerProgram, System, EXISTENTIAL_DEPOSIT};
+use hashbrown::{HashMap, HashSet};
 use supply_chain::*;
 
 mod common;
-mod ft;
-mod nft;
+mod fungible_token;
+mod non_fungible_token;
 
 pub mod prelude;
 
 pub use common::initialize_system;
-pub use ft::Sft;
-pub use nft::NonFungibleToken;
+pub use fungible_token::FungibleToken;
+pub use non_fungible_token::NonFungibleToken;
 
 pub const FOREIGN_USER: u64 = 1029384756123;
 pub const PRODUCER: u64 = 5;
 pub const DISTRIBUTOR: u64 = 7;
 pub const RETAILER: u64 = 9;
 
-type SupplyChainRunResult<T> = RunResult<T, SupplyChainEvent>;
-type SupplyChainInitResult<'a> = InitResult<SupplyChain<'a>>;
+type SupplyChainRunResult<T> = RunResult<T, SupplyChainEvent, SupplyChainError>;
 
 pub struct SupplyChain<'a>(InnerProgram<'a>);
 
@@ -30,40 +30,67 @@ impl Program for SupplyChain<'_> {
 }
 
 impl<'a> SupplyChain<'a> {
-    pub fn initialize(system: &'a System, ft_actor_id: ActorId, nft_actor_id: ActorId) -> Self {
+    pub fn initialize(
+        system: &'a System,
+        fungible_token: ActorId,
+        non_fungible_token: ActorId,
+    ) -> Self {
         Self::initialize_custom(
             system,
             SupplyChainInit {
-                producers: [PRODUCER.into()].into(),
-                distributors: [DISTRIBUTOR.into()].into(),
-                retailers: [RETAILER.into()].into(),
+                producers: vec![PRODUCER.into()],
+                distributors: vec![DISTRIBUTOR.into()],
+                retailers: vec![RETAILER.into()],
 
-                ft_actor_id,
-                nft_actor_id,
+                fungible_token,
+                non_fungible_token,
             },
         )
         .succeed()
     }
 
-    pub fn initialize_custom(system: &'a System, config: SupplyChainInit) -> SupplyChainInitResult {
+    pub fn initialize_custom(
+        system: &'a System,
+        config: SupplyChainInit,
+    ) -> InitResult<SupplyChain<'a>, SupplyChainError> {
+        Self::common_initialize_custom(system, config, |_, _| {})
+    }
+
+    pub fn initialize_custom_with_existential_deposit(
+        system: &'a System,
+        config: SupplyChainInit,
+    ) -> InitResult<SupplyChain<'a>, SupplyChainError> {
+        Self::common_initialize_custom(system, config, |system, program| {
+            system.mint_to(program.id(), EXISTENTIAL_DEPOSIT)
+        })
+    }
+
+    fn common_initialize_custom(
+        system: &'a System,
+        config: SupplyChainInit,
+        mint: fn(&System, &InnerProgram),
+    ) -> InitResult<SupplyChain<'a>, SupplyChainError> {
         let program = InnerProgram::current(system);
 
-        let is_failed = program.send(FOREIGN_USER, config).main_failed();
+        mint(system, &program);
 
-        InitResult(Self(program), is_failed)
+        let result = program.send(FOREIGN_USER, config);
+        let is_active = system.is_active_program(program.id());
+
+        InitResult::new(Self(program), result, is_active)
     }
 
     pub fn meta_state(&self) -> SupplyChainMetaState {
         SupplyChainMetaState(&self.0)
     }
 
-    pub fn produce(&self, from: u64) -> SupplyChainRunResult<u128> {
-        RunResult(
+    pub fn produce(&mut self, from: u64) -> SupplyChainRunResult<u128> {
+        RunResult::new(
             self.0.send(
                 from,
-                SupplyChainAction::Producer(ProducerAction::Produce {
+                SupplyChainAction::new(InnerSupplyChainAction::Producer(ProducerAction::Produce {
                     token_metadata: Default::default(),
-                }),
+                })),
             ),
             |item_id| SupplyChainEvent {
                 item_id: item_id.into(),
@@ -76,18 +103,20 @@ impl<'a> SupplyChain<'a> {
     }
 
     pub fn put_up_for_sale_by_producer(
-        &self,
+        &mut self,
         from: u64,
         item_id: u128,
         price: u128,
     ) -> SupplyChainRunResult<u128> {
-        RunResult(
+        RunResult::new(
             self.0.send(
                 from,
-                SupplyChainAction::Producer(ProducerAction::PutUpForSale {
-                    item_id: item_id.into(),
-                    price,
-                }),
+                SupplyChainAction::new(InnerSupplyChainAction::Producer(
+                    ProducerAction::PutUpForSale {
+                        item_id: item_id.into(),
+                        price,
+                    },
+                )),
             ),
             |item_id| SupplyChainEvent {
                 item_id: item_id.into(),
@@ -100,18 +129,20 @@ impl<'a> SupplyChain<'a> {
     }
 
     pub fn purchase_by_distributor(
-        &self,
+        &mut self,
         from: u64,
         item_id: u128,
         delivery_time: u64,
     ) -> SupplyChainRunResult<u128> {
-        RunResult(
+        RunResult::new(
             self.0.send(
                 from,
-                SupplyChainAction::Distributor(DistributorAction::Purchase {
-                    item_id: item_id.into(),
-                    delivery_time,
-                }),
+                SupplyChainAction::new(InnerSupplyChainAction::Distributor(
+                    DistributorAction::Purchase {
+                        item_id: item_id.into(),
+                        delivery_time,
+                    },
+                )),
             ),
             |item_id| SupplyChainEvent {
                 item_id: item_id.into(),
@@ -124,18 +155,18 @@ impl<'a> SupplyChain<'a> {
     }
 
     pub fn approve_by_producer(
-        &self,
+        &mut self,
         from: u64,
         item_id: u128,
         approve: bool,
     ) -> SupplyChainRunResult<(u128, bool)> {
-        RunResult(
+        RunResult::new(
             self.0.send(
                 from,
-                SupplyChainAction::Producer(ProducerAction::Approve {
+                SupplyChainAction::new(InnerSupplyChainAction::Producer(ProducerAction::Approve {
                     item_id: item_id.into(),
                     approve,
-                }),
+                })),
             ),
             |(item_id, approved)| SupplyChainEvent {
                 item_id: item_id.into(),
@@ -147,11 +178,13 @@ impl<'a> SupplyChain<'a> {
         )
     }
 
-    pub fn ship_by_producer(&self, from: u64, item_id: u128) -> SupplyChainRunResult<u128> {
-        RunResult(
+    pub fn ship_by_producer(&mut self, from: u64, item_id: u128) -> SupplyChainRunResult<u128> {
+        RunResult::new(
             self.0.send(
                 from,
-                SupplyChainAction::Producer(ProducerAction::Ship(item_id.into())),
+                SupplyChainAction::new(InnerSupplyChainAction::Producer(ProducerAction::Ship(
+                    item_id.into(),
+                ))),
             ),
             |item_id| SupplyChainEvent {
                 item_id: item_id.into(),
@@ -163,11 +196,17 @@ impl<'a> SupplyChain<'a> {
         )
     }
 
-    pub fn receive_by_distributor(&self, from: u64, item_id: u128) -> SupplyChainRunResult<u128> {
-        RunResult(
+    pub fn receive_by_distributor(
+        &mut self,
+        from: u64,
+        item_id: u128,
+    ) -> SupplyChainRunResult<u128> {
+        RunResult::new(
             self.0.send(
                 from,
-                SupplyChainAction::Distributor(DistributorAction::Receive(item_id.into())),
+                SupplyChainAction::new(InnerSupplyChainAction::Distributor(
+                    DistributorAction::Receive(item_id.into()),
+                )),
             ),
             |item_id| SupplyChainEvent {
                 item_id: item_id.into(),
@@ -179,11 +218,13 @@ impl<'a> SupplyChain<'a> {
         )
     }
 
-    pub fn process(&self, from: u64, item_id: u128) -> SupplyChainRunResult<u128> {
-        RunResult(
+    pub fn process(&mut self, from: u64, item_id: u128) -> SupplyChainRunResult<u128> {
+        RunResult::new(
             self.0.send(
                 from,
-                SupplyChainAction::Distributor(DistributorAction::Process(item_id.into())),
+                SupplyChainAction::new(InnerSupplyChainAction::Distributor(
+                    DistributorAction::Process(item_id.into()),
+                )),
             ),
             |item_id| SupplyChainEvent {
                 item_id: item_id.into(),
@@ -195,11 +236,13 @@ impl<'a> SupplyChain<'a> {
         )
     }
 
-    pub fn package(&self, from: u64, item_id: u128) -> SupplyChainRunResult<u128> {
-        RunResult(
+    pub fn package(&mut self, from: u64, item_id: u128) -> SupplyChainRunResult<u128> {
+        RunResult::new(
             self.0.send(
                 from,
-                SupplyChainAction::Distributor(DistributorAction::Package(item_id.into())),
+                SupplyChainAction::new(InnerSupplyChainAction::Distributor(
+                    DistributorAction::Package(item_id.into()),
+                )),
             ),
             |item_id| SupplyChainEvent {
                 item_id: item_id.into(),
@@ -212,18 +255,20 @@ impl<'a> SupplyChain<'a> {
     }
 
     pub fn put_up_for_sale_by_distributor(
-        &self,
+        &mut self,
         from: u64,
         item_id: u128,
         price: u128,
     ) -> SupplyChainRunResult<u128> {
-        RunResult(
+        RunResult::new(
             self.0.send(
                 from,
-                SupplyChainAction::Distributor(DistributorAction::PutUpForSale {
-                    item_id: item_id.into(),
-                    price,
-                }),
+                SupplyChainAction::new(InnerSupplyChainAction::Distributor(
+                    DistributorAction::PutUpForSale {
+                        item_id: item_id.into(),
+                        price,
+                    },
+                )),
             ),
             |item_id| SupplyChainEvent {
                 item_id: item_id.into(),
@@ -236,18 +281,20 @@ impl<'a> SupplyChain<'a> {
     }
 
     pub fn purchase_by_retailer(
-        &self,
+        &mut self,
         from: u64,
         item_id: u128,
         delivery_time: u64,
     ) -> SupplyChainRunResult<u128> {
-        RunResult(
+        RunResult::new(
             self.0.send(
                 from,
-                SupplyChainAction::Retailer(RetailerAction::Purchase {
-                    item_id: item_id.into(),
-                    delivery_time,
-                }),
+                SupplyChainAction::new(InnerSupplyChainAction::Retailer(
+                    RetailerAction::Purchase {
+                        item_id: item_id.into(),
+                        delivery_time,
+                    },
+                )),
             ),
             |item_id| SupplyChainEvent {
                 item_id: item_id.into(),
@@ -260,18 +307,20 @@ impl<'a> SupplyChain<'a> {
     }
 
     pub fn approve_by_distributor(
-        &self,
+        &mut self,
         from: u64,
         item_id: u128,
         approve: bool,
     ) -> SupplyChainRunResult<(u128, bool)> {
-        RunResult(
+        RunResult::new(
             self.0.send(
                 from,
-                SupplyChainAction::Distributor(DistributorAction::Approve {
-                    item_id: item_id.into(),
-                    approve,
-                }),
+                SupplyChainAction::new(InnerSupplyChainAction::Distributor(
+                    DistributorAction::Approve {
+                        item_id: item_id.into(),
+                        approve,
+                    },
+                )),
             ),
             |(item_id, approved)| SupplyChainEvent {
                 item_id: item_id.into(),
@@ -283,11 +332,13 @@ impl<'a> SupplyChain<'a> {
         )
     }
 
-    pub fn ship_by_distributor(&self, from: u64, item_id: u128) -> SupplyChainRunResult<u128> {
-        RunResult(
+    pub fn ship_by_distributor(&mut self, from: u64, item_id: u128) -> SupplyChainRunResult<u128> {
+        RunResult::new(
             self.0.send(
                 from,
-                SupplyChainAction::Distributor(DistributorAction::Ship(item_id.into())),
+                SupplyChainAction::new(InnerSupplyChainAction::Distributor(
+                    DistributorAction::Ship(item_id.into()),
+                )),
             ),
             |item_id| SupplyChainEvent {
                 item_id: item_id.into(),
@@ -299,11 +350,13 @@ impl<'a> SupplyChain<'a> {
         )
     }
 
-    pub fn receive_by_retailer(&self, from: u64, item_id: u128) -> SupplyChainRunResult<u128> {
-        RunResult(
+    pub fn receive_by_retailer(&mut self, from: u64, item_id: u128) -> SupplyChainRunResult<u128> {
+        RunResult::new(
             self.0.send(
                 from,
-                SupplyChainAction::Retailer(RetailerAction::Receive(item_id.into())),
+                SupplyChainAction::new(InnerSupplyChainAction::Retailer(RetailerAction::Receive(
+                    item_id.into(),
+                ))),
             ),
             |item_id| SupplyChainEvent {
                 item_id: item_id.into(),
@@ -316,18 +369,20 @@ impl<'a> SupplyChain<'a> {
     }
 
     pub fn put_up_for_sale_by_retailer(
-        &self,
+        &mut self,
         from: u64,
         item_id: u128,
         price: u128,
     ) -> SupplyChainRunResult<u128> {
-        RunResult(
+        RunResult::new(
             self.0.send(
                 from,
-                SupplyChainAction::Retailer(RetailerAction::PutUpForSale {
-                    item_id: item_id.into(),
-                    price,
-                }),
+                SupplyChainAction::new(InnerSupplyChainAction::Retailer(
+                    RetailerAction::PutUpForSale {
+                        item_id: item_id.into(),
+                        price,
+                    },
+                )),
             ),
             |item_id| SupplyChainEvent {
                 item_id: item_id.into(),
@@ -339,11 +394,13 @@ impl<'a> SupplyChain<'a> {
         )
     }
 
-    pub fn purchase_by_consumer(&self, from: u64, item_id: u128) -> SupplyChainRunResult<u128> {
-        RunResult(
+    pub fn purchase_by_consumer(&mut self, from: u64, item_id: u128) -> SupplyChainRunResult<u128> {
+        RunResult::new(
             self.0.send(
                 from,
-                SupplyChainAction::Consumer(ConsumerAction::Purchase(item_id.into())),
+                SupplyChainAction::new(InnerSupplyChainAction::Consumer(ConsumerAction::Purchase(
+                    item_id.into(),
+                ))),
             ),
             |item_id| SupplyChainEvent {
                 item_id: item_id.into(),
@@ -383,10 +440,10 @@ impl SupplyChainMetaState<'_> {
         )
     }
 
-    pub fn ft_program(self) -> MetaStateReply<ActorId> {
-        if let SupplyChainStateReply::FtContractActorId(reply) = self
+    pub fn fungible_token(self) -> MetaStateReply<ActorId> {
+        if let SupplyChainStateReply::FungibleToken(reply) = self
             .0
-            .meta_state(SupplyChainStateQuery::FtContractActorId)
+            .meta_state(SupplyChainStateQuery::FungibleToken)
             .unwrap()
         {
             MetaStateReply(reply)
@@ -395,10 +452,10 @@ impl SupplyChainMetaState<'_> {
         }
     }
 
-    pub fn nft_program(self) -> MetaStateReply<ActorId> {
-        if let SupplyChainStateReply::NftContractActorId(reply) = self
+    pub fn non_fungible_token(self) -> MetaStateReply<ActorId> {
+        if let SupplyChainStateReply::NonFungibleToken(reply) = self
             .0
-            .meta_state(SupplyChainStateQuery::NftContractActorId)
+            .meta_state(SupplyChainStateQuery::NonFungibleToken)
             .unwrap()
         {
             MetaStateReply(reply)
@@ -407,25 +464,25 @@ impl SupplyChainMetaState<'_> {
         }
     }
 
-    pub fn existing_items(self) -> MetaStateReply<BTreeMap<ItemId, ItemInfo>> {
+    pub fn existing_items(self) -> MetaStateReply<HashMap<ItemId, ItemInfo>> {
         if let SupplyChainStateReply::ExistingItems(reply) = self
             .0
             .meta_state(SupplyChainStateQuery::ExistingItems)
             .unwrap()
         {
-            MetaStateReply(reply)
+            MetaStateReply(reply.into_iter().collect())
         } else {
             unreachable!()
         }
     }
 
-    pub fn roles(self, actor_id: u64) -> MetaStateReply<BTreeSet<Role>> {
+    pub fn roles(self, actor_id: u64) -> MetaStateReply<HashSet<Role>> {
         if let SupplyChainStateReply::Roles(reply) = self
             .0
             .meta_state(SupplyChainStateQuery::Roles(actor_id.into()))
             .unwrap()
         {
-            MetaStateReply(reply)
+            MetaStateReply(reply.into_iter().collect())
         } else {
             unreachable!()
         }

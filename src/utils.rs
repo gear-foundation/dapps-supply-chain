@@ -1,3 +1,4 @@
+use crate::io::*;
 use ft_logic_io::Action;
 use ft_main_io::{FTokenAction, FTokenEvent};
 use gear_lib::non_fungible_token::{
@@ -5,76 +6,81 @@ use gear_lib::non_fungible_token::{
     token::{TokenId, TokenMetadata},
 };
 use gstd::{
-    errors::ContractError,
+    errors::Result as GstdResult,
     msg::{self, CodecMessageFuture},
     prelude::*,
     ActorId,
 };
 use nft_io::{NFTAction, NFTEvent};
 
-fn send<T: Decode>(
-    actor_id: ActorId,
-    payload: impl Encode,
-) -> Result<CodecMessageFuture<T>, ContractError> {
+fn send<T: Decode>(actor_id: ActorId, payload: impl Encode) -> GstdResult<CodecMessageFuture<T>> {
     msg::send_for_reply_as(actor_id, payload, 0)
 }
 
-fn nft_event_to_nft_transfer(nft_event: Result<NFTEvent, ContractError>) -> NFTTransfer {
-    if let NFTEvent::Transfer(nft_transfer) =
-        nft_event.expect("Failed to load or decode `NFTEvent::Transfer`")
-    {
-        nft_transfer
+fn nft_event_to_nft_transfer(
+    nft_event: GstdResult<NFTEvent>,
+) -> Result<NFTTransfer, SupplyChainError> {
+    if let NFTEvent::Transfer(nft_transfer) = nft_event? {
+        Ok(nft_transfer)
     } else {
-        panic!("Received an unexpected `NFTEvent` variant");
+        Err(SupplyChainError::NFTTransferFailed)
     }
 }
 
 pub async fn mint_nft(
     transaction_id: u64,
-    nft_actor_id: ActorId,
+    non_fungible_token: ActorId,
     token_metadata: TokenMetadata,
-) -> TokenId {
-    nft_event_to_nft_transfer(
+) -> Result<TokenId, SupplyChainError> {
+    let transfer = nft_event_to_nft_transfer(
         send(
-            nft_actor_id,
+            non_fungible_token,
             NFTAction::Mint {
                 transaction_id,
                 token_metadata,
             },
-        )
-        .expect("Failed to encode or send `NFTAction::Mint`")
+        )?
         .await,
     )
-    .token_id
+    .map_err(|error| {
+        if error == SupplyChainError::NFTTransferFailed {
+            SupplyChainError::NFTMintingFailed
+        } else {
+            error
+        }
+    })?;
+
+    Ok(transfer.token_id)
 }
 
 pub async fn transfer_nft(
     transaction_id: u64,
-    nft_actor_id: ActorId,
+    non_fungible_token: ActorId,
     to: ActorId,
     token_id: TokenId,
-) {
+) -> Result<(), SupplyChainError> {
     nft_event_to_nft_transfer(
         send(
-            nft_actor_id,
+            non_fungible_token,
             NFTAction::Transfer {
                 transaction_id,
                 to,
                 token_id,
             },
-        )
-        .expect("Failed to encode or send `NFTAction::Transfer`")
+        )?
         .await,
-    );
+    )?;
+
+    Ok(())
 }
 
 pub async fn transfer_ftokens(
     transaction_id: u64,
-    ft_actor_id: ActorId,
+    fungible_token: ActorId,
     sender: ActorId,
     recipient: ActorId,
     amount: u128,
-) {
+) -> Result<(), SupplyChainError> {
     let payload = FTokenAction::Message {
         transaction_id,
         payload: Action::Transfer {
@@ -85,12 +91,9 @@ pub async fn transfer_ftokens(
         .encode(),
     };
 
-    if FTokenEvent::Ok
-        != send(ft_actor_id, payload)
-            .expect("Failed to encode or send `FTokenAction::Message`")
-            .await
-            .expect("Failed to load or decode `FTokenEvent`")
-    {
-        panic!("Received an unexpected `FTokenEvent` variant");
+    if FTokenEvent::Ok != send(fungible_token, payload)?.await? {
+        Err(SupplyChainError::FTTransferFailed)
+    } else {
+        Ok(())
     }
 }

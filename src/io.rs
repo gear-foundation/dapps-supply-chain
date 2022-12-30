@@ -1,5 +1,5 @@
 use gear_lib::non_fungible_token::token::{TokenId, TokenMetadata};
-use gstd::{prelude::*, ActorId};
+use gstd::{errors::ContractError, prelude::*, ActorId};
 
 /// An item ID.
 ///
@@ -11,31 +11,62 @@ pub type ItemId = TokenId;
 /// # Requirements
 /// - Each [`ActorId`] of `producers`, `distributors`, and `retailers` mustn't
 /// equal [`ActorId::zero()`].
-#[derive(Encode, Decode, TypeInfo, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(Encode, Decode, Hash, TypeInfo, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct SupplyChainInit {
     /// IDs of actors that'll have the right to interact with a supply chain on
     /// behalf of a producer.
-    pub producers: BTreeSet<ActorId>,
+    pub producers: Vec<ActorId>,
     /// IDs of actors that'll have the right to interact with a supply chain on
     /// behalf of a distributor.
-    pub distributors: BTreeSet<ActorId>,
+    pub distributors: Vec<ActorId>,
     /// IDs of actors that'll have the right to interact with a supply chain on
     /// behalf of a retailer.
-    pub retailers: BTreeSet<ActorId>,
+    pub retailers: Vec<ActorId>,
 
     /// A FT contract [`ActorId`].
-    pub ft_actor_id: ActorId,
+    pub fungible_token: ActorId,
     /// An NFT contract [`ActorId`].
-    pub nft_actor_id: ActorId,
+    pub non_fungible_token: ActorId,
 }
 
 /// Sends the contract info about what it should do.
 #[derive(Encode, Decode, TypeInfo, Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
-pub enum SupplyChainAction {
+pub struct SupplyChainAction {
+    pub action: InnerSupplyChainAction,
+    pub kind: ActionKind,
+}
+
+impl SupplyChainAction {
+    pub fn new(action: InnerSupplyChainAction) -> Self {
+        Self {
+            action,
+            kind: ActionKind::New,
+        }
+    }
+
+    pub fn to_retry(self) -> Self {
+        Self {
+            action: self.action,
+            kind: ActionKind::Retry,
+        }
+    }
+}
+
+#[derive(Encode, Decode, TypeInfo, Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
+pub enum InnerSupplyChainAction {
     Producer(ProducerAction),
     Distributor(DistributorAction),
     Retailer(RetailerAction),
     Consumer(ConsumerAction),
+}
+
+#[derive(
+    Default, Encode, Decode, TypeInfo, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash,
+)]
+pub enum ActionKind {
+    #[default]
+    New,
+    Retry,
 }
 
 /// Actions for a producer.
@@ -127,7 +158,7 @@ pub enum ProducerAction {
 /// Actions for a distributor.
 ///
 /// Should be used inside [`SupplyChainAction`].
-#[derive(Encode, Decode, TypeInfo, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+#[derive(Encode, Decode, TypeInfo, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub enum DistributorAction {
     /// Purchases an item from a producer on behalf of a distributor.
     ///
@@ -271,7 +302,7 @@ pub enum DistributorAction {
 /// Actions for a retailer.
 ///
 /// Should be used inside [`SupplyChainAction`].
-#[derive(Encode, Decode, TypeInfo, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+#[derive(Encode, Decode, TypeInfo, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub enum RetailerAction {
     /// Purchases an item from a distributor on behalf of a retailer.
     ///
@@ -344,7 +375,7 @@ pub enum RetailerAction {
 /// Actions for a consumer.
 ///
 /// Should be used inside [`SupplyChainAction`].
-#[derive(Encode, Decode, TypeInfo, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+#[derive(Encode, Decode, TypeInfo, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub enum ConsumerAction {
     /// Purchases an item from a retailer.
     ///
@@ -365,14 +396,35 @@ pub enum ConsumerAction {
 }
 
 /// A result of processed [`SupplyChainAction`].
-#[derive(Encode, Decode, TypeInfo, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+#[derive(Encode, Decode, TypeInfo, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub struct SupplyChainEvent {
     pub item_id: ItemId,
     pub item_state: ItemState,
 }
+#[derive(Debug, Encode, Decode, PartialEq, Eq, PartialOrd, Ord, Clone, TypeInfo, Hash)]
+pub enum SupplyChainError {
+    ZeroActorId,
+    UnexpectedTransactionAmount,
+    TransactionNotFound,
+    ItemNotFound,
+    UnexpectedItemState,
+    AccessRestricted,
+    FTTransferFailed,
+    NFTTransferFailed,
+    NFTMintingFailed,
+    ContractError(String),
+}
+
+impl From<ContractError> for SupplyChainError {
+    fn from(error: ContractError) -> Self {
+        Self::ContractError(error.to_string())
+    }
+}
 
 /// Roles of supply chain participants.
-#[derive(Encode, Decode, TypeInfo, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+#[derive(
+    Encode, Decode, TypeInfo, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash,
+)]
 pub enum Role {
     Producer,
     Distributor,
@@ -384,33 +436,35 @@ pub enum Role {
 /// Queries a program state.
 ///
 /// On failure, returns a [`Default`] value.
-#[derive(Encode, Decode, TypeInfo, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+#[derive(Encode, Decode, TypeInfo, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub enum SupplyChainStateQuery {
     ItemInfo(ItemId),
     Participants,
     Roles(ActorId),
     ExistingItems,
-    FtContractActorId,
-    NftContractActorId,
+    FungibleToken,
+    NonFungibleToken,
 }
 
 /// A reply for queried [`SupplyChainStateQuery`].
-#[derive(Encode, Decode, TypeInfo, Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(Encode, Decode, TypeInfo, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub enum SupplyChainStateReply {
     ItemInfo(Option<ItemInfo>),
     Participants {
-        producers: BTreeSet<ActorId>,
-        distributors: BTreeSet<ActorId>,
-        retailers: BTreeSet<ActorId>,
+        producers: Vec<ActorId>,
+        distributors: Vec<ActorId>,
+        retailers: Vec<ActorId>,
     },
-    FtContractActorId(ActorId),
-    NftContractActorId(ActorId),
-    ExistingItems(BTreeMap<ItemId, ItemInfo>),
-    Roles(BTreeSet<Role>),
+    FungibleToken(ActorId),
+    NonFungibleToken(ActorId),
+    ExistingItems(Vec<(ItemId, ItemInfo)>),
+    Roles(Vec<Role>),
 }
 
 /// Item info.
-#[derive(Encode, Decode, TypeInfo, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+#[derive(
+    Encode, Decode, TypeInfo, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash,
+)]
 pub struct ItemInfo {
     /// Item’s producer [`ActorId`].
     pub producer: ActorId,
@@ -432,7 +486,7 @@ pub struct ItemInfo {
 }
 
 /// An item’s state.
-#[derive(Encode, Decode, TypeInfo, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+#[derive(Encode, Decode, TypeInfo, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub struct ItemState {
     pub state: ItemEventState,
     pub by: Role,
@@ -448,7 +502,9 @@ impl Default for ItemState {
 }
 
 /// A part of [`ItemState`].
-#[derive(Encode, Decode, TypeInfo, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+#[derive(
+    Encode, Decode, TypeInfo, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash,
+)]
 pub enum ItemEventState {
     #[default]
     Produced,

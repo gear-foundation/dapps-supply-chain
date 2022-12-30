@@ -1,4 +1,4 @@
-use utils::{prelude::*, NonFungibleToken, Sft};
+use utils::{prelude::*, FungibleToken, NonFungibleToken};
 
 pub mod utils;
 
@@ -8,65 +8,57 @@ fn interact_with_unexistent_item() {
 
     let system = utils::initialize_system();
 
-    let ft = Sft::initialize(&system);
-    let nft = NonFungibleToken::initialize(&system);
-    let supply_chain = SupplyChain::initialize(&system, ft.actor_id(), nft.actor_id());
+    let fungible_token = FungibleToken::initialize(&system);
+    let non_fungible_token = NonFungibleToken::initialize(&system);
+    let mut supply_chain = SupplyChain::initialize(
+        &system,
+        fungible_token.actor_id(),
+        non_fungible_token.actor_id(),
+    );
 
-    // Should fail because an item must exist in a supply chain.
     supply_chain
         .put_up_for_sale_by_producer(PRODUCER, NONEXISTENT_ITEM, ITEM_PRICE)
-        .failed();
-    // Should fail because an item must exist in a supply chain.
+        .failed(SupplyChainError::ItemNotFound);
     supply_chain
         .purchase_by_distributor(DISTRIBUTOR, NONEXISTENT_ITEM, DELIVERY_TIME)
-        .failed();
-    // Should fail because an item must exist in a supply chain.
+        .failed(SupplyChainError::ItemNotFound);
     supply_chain
         .approve_by_producer(PRODUCER, NONEXISTENT_ITEM, true)
-        .failed();
-    // Should fail because an item must exist in a supply chain.
+        .failed(SupplyChainError::ItemNotFound);
     supply_chain
         .ship_by_producer(PRODUCER, NONEXISTENT_ITEM)
-        .failed();
-    // Should fail because an item must exist in a supply chain.
+        .failed(SupplyChainError::ItemNotFound);
     supply_chain
         .receive_by_distributor(DISTRIBUTOR, NONEXISTENT_ITEM)
-        .failed();
-    // Should fail because an item must exist in a supply chain.
-    supply_chain.process(DISTRIBUTOR, NONEXISTENT_ITEM).failed();
-    // Should fail because an item must exist in a supply chain.
-    supply_chain.package(DISTRIBUTOR, NONEXISTENT_ITEM).failed();
-    // Should fail because an item must exist in a supply chain.
+        .failed(SupplyChainError::ItemNotFound);
+    supply_chain
+        .process(DISTRIBUTOR, NONEXISTENT_ITEM)
+        .failed(SupplyChainError::ItemNotFound);
+    supply_chain
+        .package(DISTRIBUTOR, NONEXISTENT_ITEM)
+        .failed(SupplyChainError::ItemNotFound);
     supply_chain
         .put_up_for_sale_by_distributor(DISTRIBUTOR, NONEXISTENT_ITEM, ITEM_PRICE)
-        .failed();
-    // Should fail because an item must exist in a supply chain.
+        .failed(SupplyChainError::ItemNotFound);
     supply_chain
         .purchase_by_retailer(RETAILER, NONEXISTENT_ITEM, DELIVERY_TIME)
-        .failed();
-    // Should fail because an item must exist in a supply chain.
+        .failed(SupplyChainError::ItemNotFound);
     supply_chain
         .approve_by_distributor(DISTRIBUTOR, NONEXISTENT_ITEM, true)
-        .failed();
-    // Should fail because an item must exist in a supply chain.
+        .failed(SupplyChainError::ItemNotFound);
     supply_chain
         .ship_by_distributor(DISTRIBUTOR, NONEXISTENT_ITEM)
-        .failed();
-    // Should fail because an item must exist in a supply chain.
+        .failed(SupplyChainError::ItemNotFound);
     supply_chain
         .receive_by_retailer(RETAILER, NONEXISTENT_ITEM)
-        .failed();
-    // Should fail because an item must exist in a supply chain.
+        .failed(SupplyChainError::ItemNotFound);
     supply_chain
         .put_up_for_sale_by_retailer(RETAILER, NONEXISTENT_ITEM, ITEM_PRICE)
-        .failed();
-    // Should fail because an item must exist in a supply chain.
+        .failed(SupplyChainError::ItemNotFound);
     supply_chain
         .purchase_by_consumer(CONSUMER, NONEXISTENT_ITEM)
-        .failed();
+        .failed(SupplyChainError::ItemNotFound);
 
-    // Should return `None` (`Default::default()`) because an item must exist in
-    // a supply chain.
     supply_chain
         .meta_state()
         .item_info(NONEXISTENT_ITEM)
@@ -78,30 +70,27 @@ fn interact_with_unexistent_item() {
 fn initialization() {
     let system = utils::initialize_system();
 
-    let ft = Sft::initialize(&system);
-    let nft = NonFungibleToken::initialize(&system);
+    let fungible_token = FungibleToken::initialize(&system);
+    let non_fungible_token = NonFungibleToken::initialize(&system);
 
     let mut supply_chain_config = SupplyChainInit {
-        producers: [ActorId::zero()].into(),
-        distributors: [ActorId::zero()].into(),
-        retailers: [ActorId::zero()].into(),
+        producers: vec![ActorId::zero()],
+        distributors: vec![ActorId::zero()],
+        retailers: vec![ActorId::zero()],
 
-        ft_actor_id: ft.actor_id(),
-        nft_actor_id: nft.actor_id(),
+        fungible_token: fungible_token.actor_id(),
+        non_fungible_token: non_fungible_token.actor_id(),
     };
-    // Should fail because each [`ActorId`] of `producers`, `distributors`, and
-    // `retailers` mustn't equal `ActorId::zero()`.
-    SupplyChain::initialize_custom(&system, supply_chain_config.clone()).failed();
+    SupplyChain::initialize_custom_with_existential_deposit(&system, supply_chain_config.clone())
+        .failed(SupplyChainError::ZeroActorId);
 
     supply_chain_config.producers = [PRODUCER.into()].into();
-    // Should fail because each [`ActorId`] of `producers`, `distributors`, and
-    // `retailers` mustn't equal `ActorId::zero()`.
-    SupplyChain::initialize_custom(&system, supply_chain_config.clone()).failed();
+    SupplyChain::initialize_custom_with_existential_deposit(&system, supply_chain_config.clone())
+        .failed(SupplyChainError::ZeroActorId);
 
     supply_chain_config.distributors = [DISTRIBUTOR.into()].into();
-    // Should fail because each [`ActorId`] of `producers`, `distributors`, and
-    // `retailers` mustn't equal `ActorId::zero()`.
-    SupplyChain::initialize_custom(&system, supply_chain_config.clone()).failed();
+    SupplyChain::initialize_custom_with_existential_deposit(&system, supply_chain_config.clone())
+        .failed(SupplyChainError::ZeroActorId);
 
     supply_chain_config.retailers = [RETAILER.into()].into();
     let supply_chain =
@@ -115,38 +104,49 @@ fn initialization() {
             distributors: supply_chain_config.distributors,
             retailers: supply_chain_config.retailers,
         });
-    supply_chain.meta_state().ft_program().eq(ft.actor_id());
-    supply_chain.meta_state().nft_program().eq(nft.actor_id());
+    supply_chain
+        .meta_state()
+        .fungible_token()
+        .eq(fungible_token.actor_id());
+    supply_chain
+        .meta_state()
+        .non_fungible_token()
+        .eq(non_fungible_token.actor_id());
 }
 
 #[test]
 fn query_existing_items() {
     let system = utils::initialize_system();
 
-    let ft = Sft::initialize(&system);
-    let nft = NonFungibleToken::initialize(&system);
-    let supply_chain = SupplyChain::initialize(&system, ft.actor_id(), nft.actor_id());
+    let fungible_token = FungibleToken::initialize(&system);
+    let non_fungible_token = NonFungibleToken::initialize(&system);
+    let mut supply_chain = SupplyChain::initialize(
+        &system,
+        fungible_token.actor_id(),
+        non_fungible_token.actor_id(),
+    );
 
-    let mut items_info = BTreeMap::new();
+    let item_infos = (0..=5)
+        .map(|item_id| {
+            supply_chain.produce(PRODUCER).succeed(item_id);
 
-    for item_id in 0..=5 {
-        supply_chain.produce(PRODUCER).contains(item_id);
-        items_info.insert(
-            item_id.into(),
-            ItemInfo {
-                producer: PRODUCER.into(),
-                distributor: Default::default(),
-                retailer: Default::default(),
+            (
+                item_id.into(),
+                ItemInfo {
+                    producer: PRODUCER.into(),
+                    distributor: Default::default(),
+                    retailer: Default::default(),
 
-                state: ItemState {
-                    state: Default::default(),
-                    by: Role::Producer,
+                    state: ItemState {
+                        state: Default::default(),
+                        by: Role::Producer,
+                    },
+                    price: Default::default(),
+                    delivery_time: Default::default(),
                 },
-                price: Default::default(),
-                delivery_time: Default::default(),
-            },
-        );
-    }
+            )
+        })
+        .collect();
 
-    supply_chain.meta_state().existing_items().eq(items_info);
+    supply_chain.meta_state().existing_items().eq(item_infos);
 }
