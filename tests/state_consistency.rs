@@ -3,7 +3,7 @@ use ft_logic_io::Action as FTAction;
 use ft_main_io::{FTokenAction, FTokenEvent, InitFToken};
 use gclient::{Error as GclientError, EventListener, EventProcessor, GearApi, Result};
 use gear_lib::non_fungible_token::token::TokenMetadata;
-use gstd::prelude::*;
+use gstd::{prelude::*, ActorId};
 use nft_io::InitNFT;
 use pretty_assertions::assert_eq;
 use primitive_types::H256;
@@ -11,8 +11,9 @@ use subxt::{
     error::{DispatchError, ModuleError, ModuleErrorData},
     Error as SubxtError,
 };
-use supply_chain::WASM_BINARY_OPT;
+use supply_chain::WASM_BINARY_OPT as WASM;
 use supply_chain_io::*;
+use supply_chain_state::{WASM_BINARY as META_WASM, WASM_EXPORTS as META_WASM_FNS};
 
 const ALICE: [u8; 32] = [
     212, 53, 147, 199, 21, 253, 211, 28, 97, 20, 26, 189, 4, 169, 159, 214, 130, 44, 133, 88, 133,
@@ -161,6 +162,21 @@ async fn send_message_with_insufficient_gas(
     )
 }
 
+async fn is_action_cached(
+    client: &GearApi,
+    supply_chain_actor_id: [u8; 32],
+    action: Action,
+) -> Result<bool> {
+    client
+        .read_state_using_wasm::<_, bool>(
+            supply_chain_actor_id.into(),
+            META_WASM_FNS[7],
+            META_WASM.into(),
+            Some((ActorId::from(ALICE), action.clone().action)),
+        )
+        .await
+}
+
 #[tokio::test]
 #[ignore]
 async fn state_consistency() -> Result<()> {
@@ -199,7 +215,7 @@ async fn state_consistency() -> Result<()> {
     let (supply_chain_actor_id, reply) = upload_program_and_wait_reply::<Result<(), Error>>(
         &client,
         &mut listener,
-        WASM_BINARY_OPT.into(),
+        WASM.into(),
         Initialize {
             producers: vec![ALICE.into()],
             distributors: vec![ALICE.into()],
@@ -255,7 +271,7 @@ async fn state_consistency() -> Result<()> {
             .await?
     );
 
-    // Action::Producer(ProducerAction::Produce)
+    // InnerAction::Producer(ProducerAction::Produce)
 
     println!(
         "{}",
@@ -267,6 +283,7 @@ async fn state_consistency() -> Result<()> {
         )
         .await?
     );
+    assert!(is_action_cached(&client, supply_chain_actor_id, payload.clone()).await?);
     assert_eq!(
         send_message_for_sc(
             &client,
@@ -284,7 +301,7 @@ async fn state_consistency() -> Result<()> {
         })
     );
 
-    // Action::Producer(ProducerAction::PutUpForSale)
+    // InnerAction::Producer(ProducerAction::PutUpForSale)
 
     payload = Action::new(InnerAction::Producer(ProducerAction::PutUpForSale {
         item_id,
@@ -301,6 +318,7 @@ async fn state_consistency() -> Result<()> {
         )
         .await?
     );
+    assert!(is_action_cached(&client, supply_chain_actor_id, payload.clone()).await?);
     assert_eq!(
         send_message_for_sc(
             &client,
@@ -318,7 +336,7 @@ async fn state_consistency() -> Result<()> {
         }),
     );
 
-    // Action::Distributor(DistributorAction::Purchase)
+    // InnerAction::Distributor(DistributorAction::Purchase)
 
     payload = Action::new(InnerAction::Distributor(DistributorAction::Purchase {
         item_id,
@@ -335,6 +353,7 @@ async fn state_consistency() -> Result<()> {
         )
         .await?
     );
+    assert!(is_action_cached(&client, supply_chain_actor_id, payload.clone()).await?);
     assert_eq!(
         send_message_for_sc(
             &client,
@@ -352,17 +371,19 @@ async fn state_consistency() -> Result<()> {
         }),
     );
 
-    // Action::Producer(ProducerAction::Approve)
+    // InnerAction::Producer(ProducerAction::Approve)
+
+    payload = Action::new(InnerAction::Producer(ProducerAction::Approve {
+        item_id,
+        approve,
+    }));
 
     assert_eq!(
         send_message_for_sc(
             &client,
             &mut listener,
             supply_chain_actor_id,
-            Action::new(InnerAction::Producer(ProducerAction::Approve {
-                item_id,
-                approve
-            }))
+            payload.clone()
         )
         .await?,
         Ok(Event {
@@ -373,8 +394,9 @@ async fn state_consistency() -> Result<()> {
             }
         })
     );
+    assert!(!is_action_cached(&client, supply_chain_actor_id, payload).await?);
 
-    // Action::Producer(ProducerAction::Ship)
+    // InnerAction::Producer(ProducerAction::Ship)
 
     assert_eq!(
         send_message_for_sc(
@@ -393,7 +415,7 @@ async fn state_consistency() -> Result<()> {
         }),
     );
 
-    // Action::Distributor(DistributorAction::Receive)
+    // InnerAction::Distributor(DistributorAction::Receive)
 
     payload = Action::new(InnerAction::Distributor(DistributorAction::Receive(
         item_id,
@@ -409,6 +431,7 @@ async fn state_consistency() -> Result<()> {
         )
         .await?
     );
+    assert!(is_action_cached(&client, supply_chain_actor_id, payload.clone()).await?);
     assert_eq!(
         send_message_for_sc(
             &client,
@@ -426,7 +449,7 @@ async fn state_consistency() -> Result<()> {
         }),
     );
 
-    // Action::Distributor(DistributorAction::Process)
+    // InnerAction::Distributor(DistributorAction::Process)
 
     assert_eq!(
         send_message_for_sc(
@@ -447,7 +470,7 @@ async fn state_consistency() -> Result<()> {
         }),
     );
 
-    // Action::Distributor(DistributorAction::Package)
+    // InnerAction::Distributor(DistributorAction::Package)
 
     assert_eq!(
         send_message_for_sc(
@@ -468,7 +491,7 @@ async fn state_consistency() -> Result<()> {
         }),
     );
 
-    // Action::Distributor(DistributorAction::PutUpForSale)
+    // InnerAction::Distributor(DistributorAction::PutUpForSale)
 
     payload = Action::new(InnerAction::Distributor(DistributorAction::PutUpForSale {
         item_id,
@@ -485,6 +508,7 @@ async fn state_consistency() -> Result<()> {
         )
         .await?
     );
+    assert!(is_action_cached(&client, supply_chain_actor_id, payload.clone()).await?);
     assert_eq!(
         send_message_for_sc(
             &client,
@@ -502,7 +526,7 @@ async fn state_consistency() -> Result<()> {
         }),
     );
 
-    // Action::Retailer(RetailerAction::Purchase)
+    // InnerAction::Retailer(RetailerAction::Purchase)
 
     payload = Action::new(InnerAction::Retailer(RetailerAction::Purchase {
         item_id,
@@ -519,6 +543,7 @@ async fn state_consistency() -> Result<()> {
         )
         .await?
     );
+    assert!(is_action_cached(&client, supply_chain_actor_id, payload.clone()).await?);
     assert_eq!(
         send_message_for_sc(
             &client,
@@ -536,17 +561,19 @@ async fn state_consistency() -> Result<()> {
         })
     );
 
-    // Action::Distributor(DistributorAction::Approve)
+    // InnerAction::Distributor(DistributorAction::Approve)
+
+    payload = Action::new(InnerAction::Distributor(DistributorAction::Approve {
+        item_id,
+        approve,
+    }));
 
     assert_eq!(
         send_message_for_sc(
             &client,
             &mut listener,
             supply_chain_actor_id,
-            Action::new(InnerAction::Distributor(DistributorAction::Approve {
-                item_id,
-                approve
-            }))
+            payload.clone()
         )
         .await?,
         Ok(Event {
@@ -557,8 +584,9 @@ async fn state_consistency() -> Result<()> {
             }
         }),
     );
+    assert!(!is_action_cached(&client, supply_chain_actor_id, payload).await?);
 
-    // Action::Distributor(DistributorAction::Ship)
+    // InnerAction::Distributor(DistributorAction::Ship)
 
     assert_eq!(
         send_message_for_sc(
@@ -577,7 +605,7 @@ async fn state_consistency() -> Result<()> {
         }),
     );
 
-    // Action::Retailer(RetailerAction::Receive)
+    // InnerAction::Retailer(RetailerAction::Receive)
 
     payload = Action::new(InnerAction::Retailer(RetailerAction::Receive(item_id)));
 
@@ -591,6 +619,7 @@ async fn state_consistency() -> Result<()> {
         )
         .await?
     );
+    assert!(is_action_cached(&client, supply_chain_actor_id, payload.clone()).await?);
     assert_eq!(
         send_message_for_sc(
             &client,
@@ -608,7 +637,7 @@ async fn state_consistency() -> Result<()> {
         }),
     );
 
-    // Action::Retailer(RetailerAction::PutUpForSale)
+    // InnerAction::Retailer(RetailerAction::PutUpForSale)
 
     payload = Action::new(InnerAction::Retailer(RetailerAction::PutUpForSale {
         item_id,
@@ -625,6 +654,7 @@ async fn state_consistency() -> Result<()> {
         )
         .await?
     );
+    assert!(is_action_cached(&client, supply_chain_actor_id, payload.clone()).await?);
     assert_eq!(
         send_message_for_sc(
             &client,
@@ -642,7 +672,7 @@ async fn state_consistency() -> Result<()> {
         }),
     );
 
-    // Action::Consumer(ConsumerAction::Purchase)
+    // InnerAction::Consumer(ConsumerAction::Purchase)
 
     payload = Action::new(InnerAction::Consumer(ConsumerAction::Purchase(item_id)));
 
@@ -656,6 +686,7 @@ async fn state_consistency() -> Result<()> {
         )
         .await?
     );
+    assert!(is_action_cached(&client, supply_chain_actor_id, payload.clone()).await?);
     assert_eq!(
         send_message_for_sc(
             &client,
