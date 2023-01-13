@@ -47,6 +47,7 @@ jobs:
           ./gear --tmp --dev &> /dev/null & echo -n $! > gear.pid
           make full-test
           kill `cat gear.pid`
+
       - name: Build
         run: make build
 
