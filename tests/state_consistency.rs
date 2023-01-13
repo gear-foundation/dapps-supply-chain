@@ -1,7 +1,7 @@
 use fmt::Debug;
-use ft_logic_io::Action;
+use ft_logic_io::Action as FTAction;
 use ft_main_io::{FTokenAction, FTokenEvent, InitFToken};
-use gclient::{Error, EventListener, EventProcessor, GearApi, Result};
+use gclient::{Error as GclientError, EventListener, EventProcessor, GearApi, Result};
 use gear_lib::non_fungible_token::token::TokenMetadata;
 use gstd::prelude::*;
 use nft_io::InitNFT;
@@ -11,7 +11,8 @@ use subxt::{
     error::{DispatchError, ModuleError, ModuleErrorData},
     Error as SubxtError,
 };
-use supply_chain::*;
+use supply_chain::WASM_BINARY_OPT;
+use supply_chain_io::*;
 
 const ALICE: [u8; 32] = [
     212, 53, 147, 199, 21, 253, 211, 28, 97, 20, 26, 189, 4, 169, 159, 214, 130, 44, 133, 88, 133,
@@ -25,7 +26,7 @@ fn decode<T: Decode>(payload: Vec<u8>) -> Result<T> {
 async fn upload_code(client: &GearApi, path: &str) -> Result<H256> {
     let code_id = match client.upload_code_by_path(path).await {
         Ok((code_id, _)) => code_id.into(),
-        Err(Error::Subxt(SubxtError::Runtime(DispatchError::Module(ModuleError {
+        Err(GclientError::Subxt(SubxtError::Runtime(DispatchError::Module(ModuleError {
             error_data:
                 ModuleErrorData {
                     pallet_index: 14,
@@ -44,15 +45,12 @@ async fn upload_code(client: &GearApi, path: &str) -> Result<H256> {
 async fn upload_program_and_wait_reply<T: Decode>(
     client: &GearApi,
     listener: &mut EventListener,
-    path: &str,
+    code: Vec<u8>,
     payload: impl Encode,
 ) -> Result<([u8; 32], T)> {
-    let (message_id, program_id) = common_upload_program(client, path, payload).await?;
+    let (message_id, program_id) = common_upload_program(client, code, payload).await?;
     let (_, raw_reply, _) = listener.reply_bytes_on(message_id.into()).await?;
-
     let reply = decode(raw_reply.expect("Received an error message instead of a reply"))?;
-
-    println!("Initialized `{path}`.");
 
     Ok((program_id, reply))
 }
@@ -63,7 +61,8 @@ async fn upload_program(
     path: &str,
     payload: impl Encode,
 ) -> Result<[u8; 32]> {
-    let (message_id, program_id) = common_upload_program(client, path, payload).await?;
+    let (message_id, program_id) =
+        common_upload_program(client, gclient::code_from_os(path)?, payload).await?;
 
     assert!(listener
         .message_processed(message_id.into())
@@ -76,23 +75,16 @@ async fn upload_program(
 
 async fn common_upload_program(
     client: &GearApi,
-    path: &str,
+    code: Vec<u8>,
     payload: impl Encode,
 ) -> Result<([u8; 32], [u8; 32])> {
     let encoded_payload = payload.encode();
     let gas_limit = client
-        .calculate_upload_gas(
-            None,
-            gclient::code_from_os(path)?,
-            encoded_payload,
-            0,
-            true,
-            None,
-        )
+        .calculate_upload_gas(None, code.clone(), encoded_payload, 0, true)
         .await?
         .min_limit;
     let (message_id, program_id, _) = client
-        .upload_program_by_path(path, gclient::bytes_now(), payload, gas_limit, 0)
+        .upload_program(code, gclient::bytes_now(), payload, gas_limit, 0)
         .await?;
 
     Ok((message_id.into(), program_id.into()))
@@ -109,7 +101,7 @@ async fn send_message_with_custom_limit<T: Decode>(
     let destination = destination.into();
 
     let gas_limit = client
-        .calculate_handle_gas(None, destination, encoded_payload, 0, true, None)
+        .calculate_handle_gas(None, destination, encoded_payload, 0, true)
         .await?
         .min_limit;
     let modified_gas_limit = modify_gas_limit(gas_limit);
@@ -150,7 +142,7 @@ async fn send_message_for_sc(
     listener: &mut EventListener,
     destination: [u8; 32],
     payload: impl Encode + Debug,
-) -> Result<Result<SupplyChainEvent, SupplyChainError>> {
+) -> Result<Result<Event, Error>> {
     send_message(client, listener, destination, payload).await
 }
 
@@ -204,31 +196,29 @@ async fn state_consistency() -> Result<()> {
     )
     .await?;
 
-    let (supply_chain_actor_id, reply) =
-        upload_program_and_wait_reply::<Result<(), SupplyChainError>>(
-            &client,
-            &mut listener,
-            "target/wasm32-unknown-unknown/debug/supply_chain.opt.wasm",
-            SupplyChainInit {
-                producers: vec![ALICE.into()],
-                distributors: vec![ALICE.into()],
-                retailers: vec![ALICE.into()],
+    let (supply_chain_actor_id, reply) = upload_program_and_wait_reply::<Result<(), Error>>(
+        &client,
+        &mut listener,
+        WASM_BINARY_OPT.into(),
+        Initialize {
+            producers: vec![ALICE.into()],
+            distributors: vec![ALICE.into()],
+            retailers: vec![ALICE.into()],
 
-                fungible_token: ft_actor_id.into(),
-                non_fungible_token: nft_actor_id.into(),
-            },
-        )
-        .await?;
+            fungible_token: ft_actor_id.into(),
+            non_fungible_token: nft_actor_id.into(),
+        },
+    )
+    .await?;
     assert_eq!(reply, Ok(()));
 
     let item_id = 0.into();
     let price = 123456;
     let delivery_time = 600000;
     let approve = true;
-    let mut payload =
-        SupplyChainAction::new(InnerSupplyChainAction::Producer(ProducerAction::Produce {
-            token_metadata: TokenMetadata::default(),
-        }));
+    let mut payload = Action::new(InnerAction::Producer(ProducerAction::Produce {
+        token_metadata: TokenMetadata::default(),
+    }));
 
     assert!(
         FTokenEvent::Ok
@@ -238,7 +228,7 @@ async fn state_consistency() -> Result<()> {
                 ft_actor_id,
                 FTokenAction::Message {
                     transaction_id: 0,
-                    payload: Action::Mint {
+                    payload: FTAction::Mint {
                         recipient: ALICE.into(),
                         amount: price
                     }
@@ -255,7 +245,7 @@ async fn state_consistency() -> Result<()> {
                 ft_actor_id,
                 FTokenAction::Message {
                     transaction_id: 1,
-                    payload: Action::Approve {
+                    payload: FTAction::Approve {
                         approved_account: supply_chain_actor_id.into(),
                         amount: price * 3,
                     }
@@ -265,7 +255,7 @@ async fn state_consistency() -> Result<()> {
             .await?
     );
 
-    // SupplyChainAction::Producer(ProducerAction::Produce)
+    // Action::Producer(ProducerAction::Produce)
 
     println!(
         "{}",
@@ -285,7 +275,7 @@ async fn state_consistency() -> Result<()> {
             payload.to_retry()
         )
         .await?,
-        Ok(SupplyChainEvent {
+        Ok(Event {
             item_id,
             item_state: ItemState {
                 state: ItemEventState::Produced,
@@ -294,11 +284,12 @@ async fn state_consistency() -> Result<()> {
         })
     );
 
-    // SupplyChainAction::Producer(ProducerAction::PutUpForSale)
+    // Action::Producer(ProducerAction::PutUpForSale)
 
-    payload = SupplyChainAction::new(InnerSupplyChainAction::Producer(
-        ProducerAction::PutUpForSale { item_id, price },
-    ));
+    payload = Action::new(InnerAction::Producer(ProducerAction::PutUpForSale {
+        item_id,
+        price,
+    }));
 
     println!(
         "{}",
@@ -318,7 +309,7 @@ async fn state_consistency() -> Result<()> {
             payload.to_retry()
         )
         .await?,
-        Ok(SupplyChainEvent {
+        Ok(Event {
             item_id,
             item_state: ItemState {
                 state: ItemEventState::ForSale,
@@ -327,196 +318,9 @@ async fn state_consistency() -> Result<()> {
         }),
     );
 
-    // SupplyChainAction::Distributor(DistributorAction::Purchase)
+    // Action::Distributor(DistributorAction::Purchase)
 
-    payload = SupplyChainAction::new(InnerSupplyChainAction::Distributor(
-        DistributorAction::Purchase {
-            item_id,
-            delivery_time,
-        },
-    ));
-
-    println!(
-        "{}",
-        send_message_with_insufficient_gas(
-            &client,
-            &mut listener,
-            supply_chain_actor_id,
-            payload.clone(),
-        )
-        .await?
-    );
-    assert_eq!(
-        send_message_for_sc(
-            &client,
-            &mut listener,
-            supply_chain_actor_id,
-            payload.to_retry()
-        )
-        .await?,
-        Ok(SupplyChainEvent {
-            item_id,
-            item_state: ItemState {
-                state: ItemEventState::Purchased,
-                by: Role::Distributor
-            }
-        }),
-    );
-
-    // SupplyChainAction::Producer(ProducerAction::Approve)
-
-    assert_eq!(
-        send_message_for_sc(
-            &client,
-            &mut listener,
-            supply_chain_actor_id,
-            SupplyChainAction::new(InnerSupplyChainAction::Producer(ProducerAction::Approve {
-                item_id,
-                approve
-            }))
-        )
-        .await?,
-        Ok(SupplyChainEvent {
-            item_id,
-            item_state: ItemState {
-                state: ItemEventState::Approved,
-                by: Role::Producer
-            }
-        })
-    );
-
-    // SupplyChainAction::Producer(ProducerAction::Ship)
-
-    assert_eq!(
-        send_message_for_sc(
-            &client,
-            &mut listener,
-            supply_chain_actor_id,
-            SupplyChainAction::new(InnerSupplyChainAction::Producer(ProducerAction::Ship(
-                item_id
-            )))
-        )
-        .await?,
-        Ok(SupplyChainEvent {
-            item_id,
-            item_state: ItemState {
-                state: ItemEventState::Shipped,
-                by: Role::Producer
-            }
-        }),
-    );
-
-    // SupplyChainAction::Distributor(DistributorAction::Receive)
-
-    payload = SupplyChainAction::new(InnerSupplyChainAction::Distributor(
-        DistributorAction::Receive(item_id),
-    ));
-
-    println!(
-        "{}",
-        send_message_with_insufficient_gas(
-            &client,
-            &mut listener,
-            supply_chain_actor_id,
-            payload.clone(),
-        )
-        .await?
-    );
-    assert_eq!(
-        send_message_for_sc(
-            &client,
-            &mut listener,
-            supply_chain_actor_id,
-            payload.to_retry()
-        )
-        .await?,
-        Ok(SupplyChainEvent {
-            item_id,
-            item_state: ItemState {
-                state: ItemEventState::Received,
-                by: Role::Distributor
-            }
-        }),
-    );
-
-    // SupplyChainAction::Distributor(DistributorAction::Process)
-
-    assert_eq!(
-        send_message_for_sc(
-            &client,
-            &mut listener,
-            supply_chain_actor_id,
-            SupplyChainAction::new(InnerSupplyChainAction::Distributor(
-                DistributorAction::Process(item_id)
-            ))
-        )
-        .await?,
-        Ok(SupplyChainEvent {
-            item_id,
-            item_state: ItemState {
-                state: ItemEventState::Processed,
-                by: Role::Distributor
-            }
-        }),
-    );
-
-    // SupplyChainAction::Distributor(DistributorAction::Package)
-
-    assert_eq!(
-        send_message_for_sc(
-            &client,
-            &mut listener,
-            supply_chain_actor_id,
-            SupplyChainAction::new(InnerSupplyChainAction::Distributor(
-                DistributorAction::Package(item_id)
-            ))
-        )
-        .await?,
-        Ok(SupplyChainEvent {
-            item_id,
-            item_state: ItemState {
-                state: ItemEventState::Packaged,
-                by: Role::Distributor
-            }
-        }),
-    );
-
-    // SupplyChainAction::Distributor(DistributorAction::PutUpForSale)
-
-    payload = SupplyChainAction::new(InnerSupplyChainAction::Distributor(
-        DistributorAction::PutUpForSale { item_id, price },
-    ));
-
-    println!(
-        "{}",
-        send_message_with_insufficient_gas(
-            &client,
-            &mut listener,
-            supply_chain_actor_id,
-            payload.clone(),
-        )
-        .await?
-    );
-    assert_eq!(
-        send_message_for_sc(
-            &client,
-            &mut listener,
-            supply_chain_actor_id,
-            payload.to_retry()
-        )
-        .await?,
-        Ok(SupplyChainEvent {
-            item_id,
-            item_state: ItemState {
-                state: ItemEventState::ForSale,
-                by: Role::Distributor
-            }
-        }),
-    );
-
-    // SupplyChainAction::Retailer(RetailerAction::Purchase)
-
-    payload = SupplyChainAction::new(InnerSupplyChainAction::Retailer(RetailerAction::Purchase {
+    payload = Action::new(InnerAction::Distributor(DistributorAction::Purchase {
         item_id,
         delivery_time,
     }));
@@ -539,7 +343,191 @@ async fn state_consistency() -> Result<()> {
             payload.to_retry()
         )
         .await?,
-        Ok(SupplyChainEvent {
+        Ok(Event {
+            item_id,
+            item_state: ItemState {
+                state: ItemEventState::Purchased,
+                by: Role::Distributor
+            }
+        }),
+    );
+
+    // Action::Producer(ProducerAction::Approve)
+
+    assert_eq!(
+        send_message_for_sc(
+            &client,
+            &mut listener,
+            supply_chain_actor_id,
+            Action::new(InnerAction::Producer(ProducerAction::Approve {
+                item_id,
+                approve
+            }))
+        )
+        .await?,
+        Ok(Event {
+            item_id,
+            item_state: ItemState {
+                state: ItemEventState::Approved,
+                by: Role::Producer
+            }
+        })
+    );
+
+    // Action::Producer(ProducerAction::Ship)
+
+    assert_eq!(
+        send_message_for_sc(
+            &client,
+            &mut listener,
+            supply_chain_actor_id,
+            Action::new(InnerAction::Producer(ProducerAction::Ship(item_id)))
+        )
+        .await?,
+        Ok(Event {
+            item_id,
+            item_state: ItemState {
+                state: ItemEventState::Shipped,
+                by: Role::Producer
+            }
+        }),
+    );
+
+    // Action::Distributor(DistributorAction::Receive)
+
+    payload = Action::new(InnerAction::Distributor(DistributorAction::Receive(
+        item_id,
+    )));
+
+    println!(
+        "{}",
+        send_message_with_insufficient_gas(
+            &client,
+            &mut listener,
+            supply_chain_actor_id,
+            payload.clone(),
+        )
+        .await?
+    );
+    assert_eq!(
+        send_message_for_sc(
+            &client,
+            &mut listener,
+            supply_chain_actor_id,
+            payload.to_retry()
+        )
+        .await?,
+        Ok(Event {
+            item_id,
+            item_state: ItemState {
+                state: ItemEventState::Received,
+                by: Role::Distributor
+            }
+        }),
+    );
+
+    // Action::Distributor(DistributorAction::Process)
+
+    assert_eq!(
+        send_message_for_sc(
+            &client,
+            &mut listener,
+            supply_chain_actor_id,
+            Action::new(InnerAction::Distributor(DistributorAction::Process(
+                item_id
+            )))
+        )
+        .await?,
+        Ok(Event {
+            item_id,
+            item_state: ItemState {
+                state: ItemEventState::Processed,
+                by: Role::Distributor
+            }
+        }),
+    );
+
+    // Action::Distributor(DistributorAction::Package)
+
+    assert_eq!(
+        send_message_for_sc(
+            &client,
+            &mut listener,
+            supply_chain_actor_id,
+            Action::new(InnerAction::Distributor(DistributorAction::Package(
+                item_id
+            )))
+        )
+        .await?,
+        Ok(Event {
+            item_id,
+            item_state: ItemState {
+                state: ItemEventState::Packaged,
+                by: Role::Distributor
+            }
+        }),
+    );
+
+    // Action::Distributor(DistributorAction::PutUpForSale)
+
+    payload = Action::new(InnerAction::Distributor(DistributorAction::PutUpForSale {
+        item_id,
+        price,
+    }));
+
+    println!(
+        "{}",
+        send_message_with_insufficient_gas(
+            &client,
+            &mut listener,
+            supply_chain_actor_id,
+            payload.clone(),
+        )
+        .await?
+    );
+    assert_eq!(
+        send_message_for_sc(
+            &client,
+            &mut listener,
+            supply_chain_actor_id,
+            payload.to_retry()
+        )
+        .await?,
+        Ok(Event {
+            item_id,
+            item_state: ItemState {
+                state: ItemEventState::ForSale,
+                by: Role::Distributor
+            }
+        }),
+    );
+
+    // Action::Retailer(RetailerAction::Purchase)
+
+    payload = Action::new(InnerAction::Retailer(RetailerAction::Purchase {
+        item_id,
+        delivery_time,
+    }));
+
+    println!(
+        "{}",
+        send_message_with_insufficient_gas(
+            &client,
+            &mut listener,
+            supply_chain_actor_id,
+            payload.clone(),
+        )
+        .await?
+    );
+    assert_eq!(
+        send_message_for_sc(
+            &client,
+            &mut listener,
+            supply_chain_actor_id,
+            payload.to_retry()
+        )
+        .await?,
+        Ok(Event {
             item_id,
             item_state: ItemState {
                 state: ItemEventState::Purchased,
@@ -548,19 +536,20 @@ async fn state_consistency() -> Result<()> {
         })
     );
 
-    // SupplyChainAction::Distributor(DistributorAction::Approve)
+    // Action::Distributor(DistributorAction::Approve)
 
     assert_eq!(
         send_message_for_sc(
             &client,
             &mut listener,
             supply_chain_actor_id,
-            SupplyChainAction::new(InnerSupplyChainAction::Distributor(
-                DistributorAction::Approve { item_id, approve }
-            ))
+            Action::new(InnerAction::Distributor(DistributorAction::Approve {
+                item_id,
+                approve
+            }))
         )
         .await?,
-        Ok(SupplyChainEvent {
+        Ok(Event {
             item_id,
             item_state: ItemState {
                 state: ItemEventState::Approved,
@@ -569,19 +558,17 @@ async fn state_consistency() -> Result<()> {
         }),
     );
 
-    // SupplyChainAction::Distributor(DistributorAction::Ship)
+    // Action::Distributor(DistributorAction::Ship)
 
     assert_eq!(
         send_message_for_sc(
             &client,
             &mut listener,
             supply_chain_actor_id,
-            SupplyChainAction::new(InnerSupplyChainAction::Distributor(
-                DistributorAction::Ship(item_id)
-            ))
+            Action::new(InnerAction::Distributor(DistributorAction::Ship(item_id)))
         )
         .await?,
-        Ok(SupplyChainEvent {
+        Ok(Event {
             item_id,
             item_state: ItemState {
                 state: ItemEventState::Shipped,
@@ -590,11 +577,9 @@ async fn state_consistency() -> Result<()> {
         }),
     );
 
-    // SupplyChainAction::Retailer(RetailerAction::Receive)
+    // Action::Retailer(RetailerAction::Receive)
 
-    payload = SupplyChainAction::new(InnerSupplyChainAction::Retailer(RetailerAction::Receive(
-        item_id,
-    )));
+    payload = Action::new(InnerAction::Retailer(RetailerAction::Receive(item_id)));
 
     println!(
         "{}",
@@ -614,7 +599,7 @@ async fn state_consistency() -> Result<()> {
             payload.to_retry()
         )
         .await?,
-        Ok(SupplyChainEvent {
+        Ok(Event {
             item_id,
             item_state: ItemState {
                 state: ItemEventState::Received,
@@ -623,11 +608,12 @@ async fn state_consistency() -> Result<()> {
         }),
     );
 
-    // SupplyChainAction::Retailer(RetailerAction::PutUpForSale)
+    // Action::Retailer(RetailerAction::PutUpForSale)
 
-    payload = SupplyChainAction::new(InnerSupplyChainAction::Retailer(
-        RetailerAction::PutUpForSale { item_id, price },
-    ));
+    payload = Action::new(InnerAction::Retailer(RetailerAction::PutUpForSale {
+        item_id,
+        price,
+    }));
 
     println!(
         "{}",
@@ -647,7 +633,7 @@ async fn state_consistency() -> Result<()> {
             payload.to_retry()
         )
         .await?,
-        Ok(SupplyChainEvent {
+        Ok(Event {
             item_id,
             item_state: ItemState {
                 state: ItemEventState::ForSale,
@@ -656,11 +642,9 @@ async fn state_consistency() -> Result<()> {
         }),
     );
 
-    // SupplyChainAction::Consumer(ConsumerAction::Purchase)
+    // Action::Consumer(ConsumerAction::Purchase)
 
-    payload = SupplyChainAction::new(InnerSupplyChainAction::Consumer(ConsumerAction::Purchase(
-        item_id,
-    )));
+    payload = Action::new(InnerAction::Consumer(ConsumerAction::Purchase(item_id)));
 
     println!(
         "{}",
@@ -680,7 +664,7 @@ async fn state_consistency() -> Result<()> {
             payload.to_retry()
         )
         .await?,
-        Ok(SupplyChainEvent {
+        Ok(Event {
             item_id,
             item_state: ItemState {
                 state: ItemEventState::Purchased,

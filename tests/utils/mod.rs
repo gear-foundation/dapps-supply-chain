@@ -2,7 +2,7 @@ use common::{InitResult, MetaStateReply, Program, RunResult, TransactionalProgra
 use gstd::{prelude::*, ActorId};
 use gtest::{Program as InnerProgram, System, EXISTENTIAL_DEPOSIT};
 use hashbrown::{HashMap, HashSet};
-use supply_chain::*;
+use supply_chain_io::*;
 
 mod common;
 mod fungible_token;
@@ -19,7 +19,7 @@ pub const PRODUCER: u64 = 5;
 pub const DISTRIBUTOR: u64 = 7;
 pub const RETAILER: u64 = 9;
 
-type SupplyChainRunResult<T> = RunResult<T, SupplyChainEvent, SupplyChainError>;
+type SupplyChainRunResult<T> = RunResult<T, Event, Error>;
 
 pub struct SupplyChain<'a>(InnerProgram<'a>);
 
@@ -37,7 +37,7 @@ impl<'a> SupplyChain<'a> {
     ) -> Self {
         Self::initialize_custom(
             system,
-            SupplyChainInit {
+            Initialize {
                 producers: vec![PRODUCER.into()],
                 distributors: vec![DISTRIBUTOR.into()],
                 retailers: vec![RETAILER.into()],
@@ -51,15 +51,15 @@ impl<'a> SupplyChain<'a> {
 
     pub fn initialize_custom(
         system: &'a System,
-        config: SupplyChainInit,
-    ) -> InitResult<SupplyChain<'a>, SupplyChainError> {
+        config: Initialize,
+    ) -> InitResult<SupplyChain<'a>, Error> {
         Self::common_initialize_custom(system, config, |_, _| {})
     }
 
     pub fn initialize_custom_with_existential_deposit(
         system: &'a System,
-        config: SupplyChainInit,
-    ) -> InitResult<SupplyChain<'a>, SupplyChainError> {
+        config: Initialize,
+    ) -> InitResult<SupplyChain<'a>, Error> {
         Self::common_initialize_custom(system, config, |system, program| {
             system.mint_to(program.id(), EXISTENTIAL_DEPOSIT)
         })
@@ -67,9 +67,9 @@ impl<'a> SupplyChain<'a> {
 
     fn common_initialize_custom(
         system: &'a System,
-        config: SupplyChainInit,
+        config: Initialize,
         mint: fn(&System, &InnerProgram),
-    ) -> InitResult<SupplyChain<'a>, SupplyChainError> {
+    ) -> InitResult<SupplyChain<'a>, Error> {
         let program = InnerProgram::current(system);
 
         mint(system, &program);
@@ -88,11 +88,11 @@ impl<'a> SupplyChain<'a> {
         RunResult::new(
             self.0.send(
                 from,
-                SupplyChainAction::new(InnerSupplyChainAction::Producer(ProducerAction::Produce {
+                Action::new(InnerAction::Producer(ProducerAction::Produce {
                     token_metadata: Default::default(),
                 })),
             ),
-            |item_id| SupplyChainEvent {
+            |item_id| Event {
                 item_id: item_id.into(),
                 item_state: ItemState {
                     state: ItemEventState::Produced,
@@ -111,14 +111,12 @@ impl<'a> SupplyChain<'a> {
         RunResult::new(
             self.0.send(
                 from,
-                SupplyChainAction::new(InnerSupplyChainAction::Producer(
-                    ProducerAction::PutUpForSale {
-                        item_id: item_id.into(),
-                        price,
-                    },
-                )),
+                Action::new(InnerAction::Producer(ProducerAction::PutUpForSale {
+                    item_id: item_id.into(),
+                    price,
+                })),
             ),
-            |item_id| SupplyChainEvent {
+            |item_id| Event {
                 item_id: item_id.into(),
                 item_state: ItemState {
                     state: ItemEventState::ForSale,
@@ -137,14 +135,12 @@ impl<'a> SupplyChain<'a> {
         RunResult::new(
             self.0.send(
                 from,
-                SupplyChainAction::new(InnerSupplyChainAction::Distributor(
-                    DistributorAction::Purchase {
-                        item_id: item_id.into(),
-                        delivery_time,
-                    },
-                )),
+                Action::new(InnerAction::Distributor(DistributorAction::Purchase {
+                    item_id: item_id.into(),
+                    delivery_time,
+                })),
             ),
-            |item_id| SupplyChainEvent {
+            |item_id| Event {
                 item_id: item_id.into(),
                 item_state: ItemState {
                     state: ItemEventState::Purchased,
@@ -163,12 +159,12 @@ impl<'a> SupplyChain<'a> {
         RunResult::new(
             self.0.send(
                 from,
-                SupplyChainAction::new(InnerSupplyChainAction::Producer(ProducerAction::Approve {
+                Action::new(InnerAction::Producer(ProducerAction::Approve {
                     item_id: item_id.into(),
                     approve,
                 })),
             ),
-            |(item_id, approved)| SupplyChainEvent {
+            |(item_id, approved)| Event {
                 item_id: item_id.into(),
                 item_state: ItemState {
                     state: bool_to_event(approved),
@@ -182,11 +178,9 @@ impl<'a> SupplyChain<'a> {
         RunResult::new(
             self.0.send(
                 from,
-                SupplyChainAction::new(InnerSupplyChainAction::Producer(ProducerAction::Ship(
-                    item_id.into(),
-                ))),
+                Action::new(InnerAction::Producer(ProducerAction::Ship(item_id.into()))),
             ),
-            |item_id| SupplyChainEvent {
+            |item_id| Event {
                 item_id: item_id.into(),
                 item_state: ItemState {
                     state: ItemEventState::Shipped,
@@ -204,11 +198,11 @@ impl<'a> SupplyChain<'a> {
         RunResult::new(
             self.0.send(
                 from,
-                SupplyChainAction::new(InnerSupplyChainAction::Distributor(
-                    DistributorAction::Receive(item_id.into()),
-                )),
+                Action::new(InnerAction::Distributor(DistributorAction::Receive(
+                    item_id.into(),
+                ))),
             ),
-            |item_id| SupplyChainEvent {
+            |item_id| Event {
                 item_id: item_id.into(),
                 item_state: ItemState {
                     state: ItemEventState::Received,
@@ -222,11 +216,11 @@ impl<'a> SupplyChain<'a> {
         RunResult::new(
             self.0.send(
                 from,
-                SupplyChainAction::new(InnerSupplyChainAction::Distributor(
-                    DistributorAction::Process(item_id.into()),
-                )),
+                Action::new(InnerAction::Distributor(DistributorAction::Process(
+                    item_id.into(),
+                ))),
             ),
-            |item_id| SupplyChainEvent {
+            |item_id| Event {
                 item_id: item_id.into(),
                 item_state: ItemState {
                     state: ItemEventState::Processed,
@@ -240,11 +234,11 @@ impl<'a> SupplyChain<'a> {
         RunResult::new(
             self.0.send(
                 from,
-                SupplyChainAction::new(InnerSupplyChainAction::Distributor(
-                    DistributorAction::Package(item_id.into()),
-                )),
+                Action::new(InnerAction::Distributor(DistributorAction::Package(
+                    item_id.into(),
+                ))),
             ),
-            |item_id| SupplyChainEvent {
+            |item_id| Event {
                 item_id: item_id.into(),
                 item_state: ItemState {
                     state: ItemEventState::Packaged,
@@ -263,14 +257,12 @@ impl<'a> SupplyChain<'a> {
         RunResult::new(
             self.0.send(
                 from,
-                SupplyChainAction::new(InnerSupplyChainAction::Distributor(
-                    DistributorAction::PutUpForSale {
-                        item_id: item_id.into(),
-                        price,
-                    },
-                )),
+                Action::new(InnerAction::Distributor(DistributorAction::PutUpForSale {
+                    item_id: item_id.into(),
+                    price,
+                })),
             ),
-            |item_id| SupplyChainEvent {
+            |item_id| Event {
                 item_id: item_id.into(),
                 item_state: ItemState {
                     state: ItemEventState::ForSale,
@@ -289,14 +281,12 @@ impl<'a> SupplyChain<'a> {
         RunResult::new(
             self.0.send(
                 from,
-                SupplyChainAction::new(InnerSupplyChainAction::Retailer(
-                    RetailerAction::Purchase {
-                        item_id: item_id.into(),
-                        delivery_time,
-                    },
-                )),
+                Action::new(InnerAction::Retailer(RetailerAction::Purchase {
+                    item_id: item_id.into(),
+                    delivery_time,
+                })),
             ),
-            |item_id| SupplyChainEvent {
+            |item_id| Event {
                 item_id: item_id.into(),
                 item_state: ItemState {
                     state: ItemEventState::Purchased,
@@ -315,14 +305,12 @@ impl<'a> SupplyChain<'a> {
         RunResult::new(
             self.0.send(
                 from,
-                SupplyChainAction::new(InnerSupplyChainAction::Distributor(
-                    DistributorAction::Approve {
-                        item_id: item_id.into(),
-                        approve,
-                    },
-                )),
+                Action::new(InnerAction::Distributor(DistributorAction::Approve {
+                    item_id: item_id.into(),
+                    approve,
+                })),
             ),
-            |(item_id, approved)| SupplyChainEvent {
+            |(item_id, approved)| Event {
                 item_id: item_id.into(),
                 item_state: ItemState {
                     state: bool_to_event(approved),
@@ -336,11 +324,11 @@ impl<'a> SupplyChain<'a> {
         RunResult::new(
             self.0.send(
                 from,
-                SupplyChainAction::new(InnerSupplyChainAction::Distributor(
-                    DistributorAction::Ship(item_id.into()),
-                )),
+                Action::new(InnerAction::Distributor(DistributorAction::Ship(
+                    item_id.into(),
+                ))),
             ),
-            |item_id| SupplyChainEvent {
+            |item_id| Event {
                 item_id: item_id.into(),
                 item_state: ItemState {
                     state: ItemEventState::Shipped,
@@ -354,11 +342,11 @@ impl<'a> SupplyChain<'a> {
         RunResult::new(
             self.0.send(
                 from,
-                SupplyChainAction::new(InnerSupplyChainAction::Retailer(RetailerAction::Receive(
+                Action::new(InnerAction::Retailer(RetailerAction::Receive(
                     item_id.into(),
                 ))),
             ),
-            |item_id| SupplyChainEvent {
+            |item_id| Event {
                 item_id: item_id.into(),
                 item_state: ItemState {
                     state: ItemEventState::Received,
@@ -377,14 +365,12 @@ impl<'a> SupplyChain<'a> {
         RunResult::new(
             self.0.send(
                 from,
-                SupplyChainAction::new(InnerSupplyChainAction::Retailer(
-                    RetailerAction::PutUpForSale {
-                        item_id: item_id.into(),
-                        price,
-                    },
-                )),
+                Action::new(InnerAction::Retailer(RetailerAction::PutUpForSale {
+                    item_id: item_id.into(),
+                    price,
+                })),
             ),
-            |item_id| SupplyChainEvent {
+            |item_id| Event {
                 item_id: item_id.into(),
                 item_state: ItemState {
                     state: ItemEventState::ForSale,
@@ -398,11 +384,11 @@ impl<'a> SupplyChain<'a> {
         RunResult::new(
             self.0.send(
                 from,
-                SupplyChainAction::new(InnerSupplyChainAction::Consumer(ConsumerAction::Purchase(
+                Action::new(InnerAction::Consumer(ConsumerAction::Purchase(
                     item_id.into(),
                 ))),
             ),
-            |item_id| SupplyChainEvent {
+            |item_id| Event {
                 item_id: item_id.into(),
                 item_state: ItemState {
                     state: ItemEventState::Purchased,
@@ -421,9 +407,9 @@ impl SupplyChainMetaState<'_> {
     }
 
     pub fn item_info(self, item_id: u128) -> MetaStateReply<Option<ItemInfo>> {
-        if let SupplyChainStateReply::ItemInfo(reply) = self
+        if let StateReply::ItemInfo(reply) = self
             .0
-            .meta_state(SupplyChainStateQuery::ItemInfo(item_id.into()))
+            .meta_state(StateQuery::ItemInfo(item_id.into()))
             .unwrap()
         {
             MetaStateReply(reply)
@@ -432,19 +418,19 @@ impl SupplyChainMetaState<'_> {
         }
     }
 
-    pub fn participants(self) -> MetaStateReply<SupplyChainStateReply> {
-        MetaStateReply(
-            self.0
-                .meta_state(SupplyChainStateQuery::Participants)
-                .unwrap(),
-        )
+    pub fn participants(self) -> MetaStateReply<Participants> {
+        if let StateReply::Participants(reply) =
+            self.0.meta_state(StateQuery::Participants).unwrap()
+        {
+            MetaStateReply(reply)
+        } else {
+            unreachable!()
+        }
     }
 
     pub fn fungible_token(self) -> MetaStateReply<ActorId> {
-        if let SupplyChainStateReply::FungibleToken(reply) = self
-            .0
-            .meta_state(SupplyChainStateQuery::FungibleToken)
-            .unwrap()
+        if let StateReply::FungibleToken(reply) =
+            self.0.meta_state(StateQuery::FungibleToken).unwrap()
         {
             MetaStateReply(reply)
         } else {
@@ -453,10 +439,8 @@ impl SupplyChainMetaState<'_> {
     }
 
     pub fn non_fungible_token(self) -> MetaStateReply<ActorId> {
-        if let SupplyChainStateReply::NonFungibleToken(reply) = self
-            .0
-            .meta_state(SupplyChainStateQuery::NonFungibleToken)
-            .unwrap()
+        if let StateReply::NonFungibleToken(reply) =
+            self.0.meta_state(StateQuery::NonFungibleToken).unwrap()
         {
             MetaStateReply(reply)
         } else {
@@ -465,10 +449,8 @@ impl SupplyChainMetaState<'_> {
     }
 
     pub fn existing_items(self) -> MetaStateReply<HashMap<ItemId, ItemInfo>> {
-        if let SupplyChainStateReply::ExistingItems(reply) = self
-            .0
-            .meta_state(SupplyChainStateQuery::ExistingItems)
-            .unwrap()
+        if let StateReply::ExistingItems(reply) =
+            self.0.meta_state(StateQuery::ExistingItems).unwrap()
         {
             MetaStateReply(reply.into_iter().collect())
         } else {
@@ -477,9 +459,9 @@ impl SupplyChainMetaState<'_> {
     }
 
     pub fn roles(self, actor_id: u64) -> MetaStateReply<HashSet<Role>> {
-        if let SupplyChainStateReply::Roles(reply) = self
+        if let StateReply::Roles(reply) = self
             .0
-            .meta_state(SupplyChainStateQuery::Roles(actor_id.into()))
+            .meta_state(StateQuery::Roles(actor_id.into()))
             .unwrap()
         {
             MetaStateReply(reply.into_iter().collect())

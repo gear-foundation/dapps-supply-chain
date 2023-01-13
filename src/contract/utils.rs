@@ -1,4 +1,4 @@
-use crate::io::*;
+use crate::contract::tx_manager::TransactionGuard;
 use ft_logic_io::Action;
 use ft_main_io::{FTokenAction, FTokenEvent};
 use gear_lib::non_fungible_token::{
@@ -12,39 +12,38 @@ use gstd::{
     ActorId,
 };
 use nft_io::{NFTAction, NFTEvent};
+use supply_chain_io::*;
 
-fn send<T: Decode>(actor_id: ActorId, payload: impl Encode) -> GstdResult<CodecMessageFuture<T>> {
-    msg::send_for_reply_as(actor_id, payload, 0)
+fn send<T: Decode>(actor: ActorId, payload: impl Encode) -> GstdResult<CodecMessageFuture<T>> {
+    msg::send_for_reply_as(actor, payload, 0)
 }
 
-fn nft_event_to_nft_transfer(
-    nft_event: GstdResult<NFTEvent>,
-) -> Result<NFTTransfer, SupplyChainError> {
-    if let NFTEvent::Transfer(nft_transfer) = nft_event? {
-        Ok(nft_transfer)
+fn nft_event_to_transfer(event: GstdResult<NFTEvent>) -> Result<NFTTransfer, Error> {
+    if let NFTEvent::Transfer(transfer) = event? {
+        Ok(transfer)
     } else {
-        Err(SupplyChainError::NFTTransferFailed)
+        Err(Error::NFTTransferFailed)
     }
 }
 
-pub async fn mint_nft(
-    transaction_id: u64,
+pub async fn mint_nft<T>(
+    tx_guard: &mut TransactionGuard<'_, T>,
     non_fungible_token: ActorId,
     token_metadata: TokenMetadata,
-) -> Result<TokenId, SupplyChainError> {
-    let transfer = nft_event_to_nft_transfer(
+) -> Result<TokenId, Error> {
+    let transfer = nft_event_to_transfer(
         send(
             non_fungible_token,
             NFTAction::Mint {
-                transaction_id,
+                transaction_id: tx_guard.step()?,
                 token_metadata,
             },
         )?
         .await,
     )
     .map_err(|error| {
-        if error == SupplyChainError::NFTTransferFailed {
-            SupplyChainError::NFTMintingFailed
+        if error == Error::NFTTransferFailed {
+            Error::NFTMintingFailed
         } else {
             error
         }
@@ -53,17 +52,17 @@ pub async fn mint_nft(
     Ok(transfer.token_id)
 }
 
-pub async fn transfer_nft(
-    transaction_id: u64,
+pub async fn transfer_nft<T>(
+    tx_guard: &mut TransactionGuard<'_, T>,
     non_fungible_token: ActorId,
     to: ActorId,
     token_id: TokenId,
-) -> Result<(), SupplyChainError> {
-    nft_event_to_nft_transfer(
+) -> Result<(), Error> {
+    nft_event_to_transfer(
         send(
             non_fungible_token,
             NFTAction::Transfer {
-                transaction_id,
+                transaction_id: tx_guard.step()?,
                 to,
                 token_id,
             },
@@ -74,15 +73,15 @@ pub async fn transfer_nft(
     Ok(())
 }
 
-pub async fn transfer_ftokens(
-    transaction_id: u64,
+pub async fn transfer_ftokens<T>(
+    tx_guard: &mut TransactionGuard<'_, T>,
     fungible_token: ActorId,
     sender: ActorId,
     recipient: ActorId,
     amount: u128,
-) -> Result<(), SupplyChainError> {
+) -> Result<(), Error> {
     let payload = FTokenAction::Message {
-        transaction_id,
+        transaction_id: tx_guard.step()?,
         payload: Action::Transfer {
             sender,
             recipient,
@@ -92,7 +91,7 @@ pub async fn transfer_ftokens(
     };
 
     if FTokenEvent::Ok != send(fungible_token, payload)?.await? {
-        Err(SupplyChainError::FTTransferFailed)
+        Err(Error::FTTransferFailed)
     } else {
         Ok(())
     }

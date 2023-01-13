@@ -6,9 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.2.0] - 2022-12-03
+## [0.2.0] - 2023-01-13
 ### Added
 - Integration with SFT.
+- Transaction caching.
+- Error handling.
+- New meta.
 ### Changed
 - Structure of `*Action`s & their documentation. Now they're divided for supply chain roles.
 - Synced with the `app` template.

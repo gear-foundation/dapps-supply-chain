@@ -27,84 +27,84 @@ fn state() {
         .succeed(0);
     supply_chain
         .put_up_for_sale_by_producer(PRODUCER, 0, ITEM_PRICE)
-        .failed(SupplyChainError::UnexpectedItemState);
+        .failed(Error::UnexpectedItemState);
 
     supply_chain
         .purchase_by_distributor(DISTRIBUTOR, 0, DELIVERY_TIME)
         .succeed(0);
     supply_chain
         .purchase_by_distributor(DISTRIBUTOR, 0, DELIVERY_TIME)
-        .failed(SupplyChainError::UnexpectedItemState);
+        .failed(Error::UnexpectedItemState);
 
     supply_chain
         .approve_by_producer(PRODUCER, 0, true)
         .succeed((0, true));
     supply_chain
         .approve_by_producer(PRODUCER, 0, true)
-        .failed(SupplyChainError::UnexpectedItemState);
+        .failed(Error::UnexpectedItemState);
 
     supply_chain.ship_by_producer(PRODUCER, 0).succeed(0);
     supply_chain
         .ship_by_producer(PRODUCER, 0)
-        .failed(SupplyChainError::UnexpectedItemState);
+        .failed(Error::UnexpectedItemState);
 
     supply_chain
         .receive_by_distributor(DISTRIBUTOR, 0)
         .succeed(0);
     supply_chain
         .receive_by_distributor(DISTRIBUTOR, 0)
-        .failed(SupplyChainError::UnexpectedItemState);
+        .failed(Error::UnexpectedItemState);
 
     supply_chain.process(DISTRIBUTOR, 0).succeed(0);
     supply_chain
         .process(DISTRIBUTOR, 0)
-        .failed(SupplyChainError::UnexpectedItemState);
+        .failed(Error::UnexpectedItemState);
 
     supply_chain.package(DISTRIBUTOR, 0).succeed(0);
     supply_chain
         .package(DISTRIBUTOR, 0)
-        .failed(SupplyChainError::UnexpectedItemState);
+        .failed(Error::UnexpectedItemState);
 
     supply_chain
         .put_up_for_sale_by_distributor(DISTRIBUTOR, 0, ITEM_PRICE)
         .succeed(0);
     supply_chain
         .put_up_for_sale_by_distributor(DISTRIBUTOR, 0, ITEM_PRICE)
-        .failed(SupplyChainError::UnexpectedItemState);
+        .failed(Error::UnexpectedItemState);
 
     supply_chain
         .purchase_by_retailer(RETAILER, 0, DELIVERY_TIME)
         .succeed(0);
     supply_chain
         .purchase_by_retailer(RETAILER, 0, DELIVERY_TIME)
-        .failed(SupplyChainError::UnexpectedItemState);
+        .failed(Error::UnexpectedItemState);
 
     supply_chain
         .approve_by_distributor(DISTRIBUTOR, 0, true)
         .succeed((0, true));
     supply_chain
         .approve_by_distributor(DISTRIBUTOR, 0, true)
-        .failed(SupplyChainError::UnexpectedItemState);
+        .failed(Error::UnexpectedItemState);
 
     supply_chain.ship_by_distributor(DISTRIBUTOR, 0).succeed(0);
     supply_chain
         .ship_by_distributor(DISTRIBUTOR, 0)
-        .failed(SupplyChainError::UnexpectedItemState);
+        .failed(Error::UnexpectedItemState);
 
     supply_chain.receive_by_retailer(RETAILER, 0).succeed(0);
     supply_chain
         .receive_by_retailer(RETAILER, 0)
-        .failed(SupplyChainError::UnexpectedItemState);
+        .failed(Error::UnexpectedItemState);
 
     supply_chain
         .put_up_for_sale_by_retailer(RETAILER, 0, ITEM_PRICE)
         .succeed(0);
     supply_chain
         .put_up_for_sale_by_retailer(RETAILER, 0, ITEM_PRICE)
-        .failed(SupplyChainError::UnexpectedItemState);
+        .failed(Error::UnexpectedItemState);
 
     supply_chain.purchase_by_consumer(CONSUMER, 0).succeed(0);
     supply_chain
         .purchase_by_consumer(CONSUMER, 0)
-        .failed(SupplyChainError::UnexpectedItemState);
+        .failed(Error::UnexpectedItemState);
 }

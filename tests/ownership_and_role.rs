@@ -15,7 +15,7 @@ fn ownership_and_role() {
     let mut fungible_token = FungibleToken::initialize(&system);
     let mut supply_chain = SupplyChain::initialize_custom(
         &system,
-        SupplyChainInit {
+        Initialize {
             producers: [PRODUCER[0].into(), PRODUCER[1].into()].into(),
             distributors: [DISTRIBUTOR[0].into(), DISTRIBUTOR[1].into()].into(),
             retailers: [RETAILER[0].into(), RETAILER[1].into()].into(),
@@ -34,121 +34,121 @@ fn ownership_and_role() {
     // Should fail because `msg::source()` must be a producer.
     supply_chain
         .produce(FOREIGN_USER)
-        .failed(SupplyChainError::AccessRestricted);
+        .failed(Error::AccessRestricted);
     supply_chain.produce(PRODUCER[0]).succeed(0);
 
     supply_chain
         .put_up_for_sale_by_producer(FOREIGN_USER, 0, ITEM_PRICE)
-        .failed(SupplyChainError::AccessRestricted);
+        .failed(Error::AccessRestricted);
     supply_chain
         .put_up_for_sale_by_producer(PRODUCER[1], 0, ITEM_PRICE)
-        .failed(SupplyChainError::AccessRestricted);
+        .failed(Error::AccessRestricted);
     supply_chain
         .put_up_for_sale_by_producer(PRODUCER[0], 0, ITEM_PRICE)
         .succeed(0);
 
     supply_chain
         .purchase_by_distributor(FOREIGN_USER, 0, DELIVERY_TIME)
-        .failed(SupplyChainError::AccessRestricted);
+        .failed(Error::AccessRestricted);
     supply_chain
         .purchase_by_distributor(DISTRIBUTOR[0], 0, DELIVERY_TIME)
         .succeed(0);
 
     supply_chain
         .approve_by_producer(FOREIGN_USER, 0, true)
-        .failed(SupplyChainError::AccessRestricted);
+        .failed(Error::AccessRestricted);
     supply_chain
         .approve_by_producer(PRODUCER[1], 0, true)
-        .failed(SupplyChainError::AccessRestricted);
+        .failed(Error::AccessRestricted);
     supply_chain
         .approve_by_producer(PRODUCER[0], 0, true)
         .succeed((0, true));
 
     supply_chain
         .ship_by_producer(FOREIGN_USER, 0)
-        .failed(SupplyChainError::AccessRestricted);
+        .failed(Error::AccessRestricted);
     supply_chain
         .ship_by_producer(PRODUCER[1], 0)
-        .failed(SupplyChainError::AccessRestricted);
+        .failed(Error::AccessRestricted);
     supply_chain.ship_by_producer(PRODUCER[0], 0).succeed(0);
 
     supply_chain
         .receive_by_distributor(FOREIGN_USER, 0)
-        .failed(SupplyChainError::AccessRestricted);
+        .failed(Error::AccessRestricted);
     supply_chain
         .receive_by_distributor(DISTRIBUTOR[1], 0)
-        .failed(SupplyChainError::AccessRestricted);
+        .failed(Error::AccessRestricted);
     supply_chain
         .receive_by_distributor(DISTRIBUTOR[0], 0)
         .succeed(0);
 
     supply_chain
         .process(FOREIGN_USER, 0)
-        .failed(SupplyChainError::AccessRestricted);
+        .failed(Error::AccessRestricted);
     supply_chain
         .process(DISTRIBUTOR[1], 0)
-        .failed(SupplyChainError::AccessRestricted);
+        .failed(Error::AccessRestricted);
     supply_chain.process(DISTRIBUTOR[0], 0).succeed(0);
 
     supply_chain
         .package(FOREIGN_USER, 0)
-        .failed(SupplyChainError::AccessRestricted);
+        .failed(Error::AccessRestricted);
     supply_chain
         .package(DISTRIBUTOR[1], 0)
-        .failed(SupplyChainError::AccessRestricted);
+        .failed(Error::AccessRestricted);
     supply_chain.package(DISTRIBUTOR[0], 0).succeed(0);
 
     supply_chain
         .put_up_for_sale_by_distributor(FOREIGN_USER, 0, ITEM_PRICE)
-        .failed(SupplyChainError::AccessRestricted);
+        .failed(Error::AccessRestricted);
     supply_chain
         .put_up_for_sale_by_distributor(DISTRIBUTOR[1], 0, ITEM_PRICE)
-        .failed(SupplyChainError::AccessRestricted);
+        .failed(Error::AccessRestricted);
     supply_chain
         .put_up_for_sale_by_distributor(DISTRIBUTOR[0], 0, ITEM_PRICE)
         .succeed(0);
 
     supply_chain
         .purchase_by_retailer(FOREIGN_USER, 0, DELIVERY_TIME)
-        .failed(SupplyChainError::AccessRestricted);
+        .failed(Error::AccessRestricted);
     supply_chain
         .purchase_by_retailer(RETAILER[0], 0, DELIVERY_TIME)
         .succeed(0);
 
     supply_chain
         .approve_by_distributor(FOREIGN_USER, 0, true)
-        .failed(SupplyChainError::AccessRestricted);
+        .failed(Error::AccessRestricted);
     supply_chain
         .approve_by_distributor(DISTRIBUTOR[1], 0, true)
-        .failed(SupplyChainError::AccessRestricted);
+        .failed(Error::AccessRestricted);
     supply_chain
         .approve_by_distributor(DISTRIBUTOR[0], 0, true)
         .succeed((0, true));
 
     supply_chain
         .ship_by_distributor(FOREIGN_USER, 0)
-        .failed(SupplyChainError::AccessRestricted);
+        .failed(Error::AccessRestricted);
     supply_chain
         .ship_by_distributor(DISTRIBUTOR[1], 0)
-        .failed(SupplyChainError::AccessRestricted);
+        .failed(Error::AccessRestricted);
     supply_chain
         .ship_by_distributor(DISTRIBUTOR[0], 0)
         .succeed(0);
 
     supply_chain
         .receive_by_retailer(FOREIGN_USER, 0)
-        .failed(SupplyChainError::AccessRestricted);
+        .failed(Error::AccessRestricted);
     supply_chain
         .receive_by_retailer(RETAILER[1], 0)
-        .failed(SupplyChainError::AccessRestricted);
+        .failed(Error::AccessRestricted);
     supply_chain.receive_by_retailer(RETAILER[0], 0).succeed(0);
 
     supply_chain
         .put_up_for_sale_by_retailer(FOREIGN_USER, 0, ITEM_PRICE)
-        .failed(SupplyChainError::AccessRestricted);
+        .failed(Error::AccessRestricted);
     supply_chain
         .put_up_for_sale_by_retailer(RETAILER[1], 0, ITEM_PRICE)
-        .failed(SupplyChainError::AccessRestricted);
+        .failed(Error::AccessRestricted);
 }
 
 #[test]
@@ -160,7 +160,7 @@ fn query_roles() {
 
     let mut supply_chain = SupplyChain::initialize_custom(
         &system,
-        SupplyChainInit {
+        Initialize {
             producers: vec![FOREIGN_USER.into()],
             distributors: vec![FOREIGN_USER.into()],
             retailers: vec![FOREIGN_USER.into()],
@@ -180,7 +180,7 @@ fn query_roles() {
 
     supply_chain = SupplyChain::initialize_custom(
         &system,
-        SupplyChainInit {
+        Initialize {
             producers: [].into(),
             distributors: [].into(),
             retailers: [].into(),

@@ -1,10 +1,10 @@
-.PHONY: all build clean fmt fmt-check init lint pre-commit test full-test
+PHONY: all build clean fmt fmt-check init lint pre-commit test full-test
 
-all: init build
+all: init build test
 
 build:
 	@echo ⚙️ Building a release...
-	@cargo +nightly b -r
+	@cargo +nightly b -r --workspace
 	@ls -l target/wasm32-unknown-unknown/release/*.wasm
 
 fmt:
@@ -16,13 +16,18 @@ fmt-check:
 	@cargo fmt --all --check
 
 init:
-	@echo ⚙️ Installing a toolchain & a target...
+	@echo ⚙️ Installing a toolchain \& a target...
 	@rustup toolchain add nightly
 	@rustup target add wasm32-unknown-unknown --toolchain nightly
 
 lint:
 	@echo ⚙️ Running the linter...
-	@cargo +nightly clippy --all-targets -- -D warnings
+	@cargo +nightly clippy -- -D warnings
+	@cargo +nightly clippy \
+	--all-targets \
+	--workspace \
+	-Fbinary-vendor \
+	-- -D warnings
 
 pre-commit: fmt lint full-test
 
@@ -65,4 +70,4 @@ test: deps
 
 full-test: deps
 	@echo ⚙️ Running all tests...
-	@cargo +nightly t -- --include-ignored
+	@cargo +nightly t -Fbinary-vendor -- --include-ignored
