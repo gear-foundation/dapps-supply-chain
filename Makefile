@@ -62,7 +62,7 @@ deps:
 
 test: deps
 	@echo ⚙️ Running unit tests...
-	@cargo +nightly t
+	@cargo +nightly t -Fbinary-vendor
 
 full-test: deps
 	@echo ⚙️ Running all tests...
