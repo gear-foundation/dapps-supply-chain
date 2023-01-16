@@ -60,7 +60,7 @@ impl<T: PartialEq + Clone> TransactionManager<T> {
                     .get(&msg_source)
                     .ok_or(TransactionCacheError::TransactionNotFound)?;
 
-                if &check_action != true_checked_action {
+                if check_action.ne(true_checked_action) {
                     return Err(TransactionCacheError::MismatchedAction);
                 }
 

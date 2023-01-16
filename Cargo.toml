@@ -27,7 +27,7 @@ subxt = { version = "0.25", default-features = false }
 primitive-types = "0.12"
 tokio = "1"
 pretty_assertions = "1"
-supply-chain-state = { path = "state", features = ["binary-vendor"] }
+supply-chain-state = { path = "state" }
 
 [build-dependencies]
 # TODO: pin to the "stable" branch before the merge.
@@ -35,7 +35,7 @@ gear-wasm-builder = { git = "https://github.com/gear-tech/gear.git" }
 supply-chain-io = { path = "io" }
 
 [features]
-binary-vendor = []
+binary-vendor = ["supply-chain-state/binary-vendor"]
 
 [workspace]
 members = ["state"]
