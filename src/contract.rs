@@ -769,16 +769,3 @@ extern "C" fn metahash() {
     reply(include!("../.metahash"))
         .expect("Failed to encode or reply with `[u8; 32]` from `metahash()`");
 }
-
-gstd::metadata! {
-    title: "Supply chain",
-    init:
-        input: Initialize,
-        output: Result<(), Error>,
-    handle:
-        input: Action,
-        output: Result<Event, Error>,
-    state:
-        input: StateQuery,
-        output: StateReply,
-}

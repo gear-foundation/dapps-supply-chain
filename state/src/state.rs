@@ -38,4 +38,4 @@ pub trait Metawasm {
 }
 
 // #[metawasm] doesn't process the explicit tuple type ¯\_(ツ)_/¯.
-type ActorIdInnerSupplyChainAction = (ActorId, InnerAction);
+pub type ActorIdInnerSupplyChainAction = (ActorId, InnerAction);
