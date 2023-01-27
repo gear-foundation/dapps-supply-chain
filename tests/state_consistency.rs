@@ -85,7 +85,13 @@ async fn common_upload_program(
         .await?
         .min_limit;
     let (message_id, program_id, _) = client
-        .upload_program(code, gclient::bytes_now(), payload, gas_limit, 0)
+        .upload_program(
+            code,
+            gclient::now_in_micros().to_le_bytes(),
+            payload,
+            gas_limit,
+            0,
+        )
         .await?;
 
     Ok((message_id.into(), program_id.into()))
