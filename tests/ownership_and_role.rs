@@ -3,9 +3,9 @@ use utils::{prelude::*, FungibleToken, NonFungibleToken};
 pub mod utils;
 
 // Pairs of participants are needed here to test ownership of items.
-const PRODUCER: [u64; 2] = [5, 6];
-const DISTRIBUTOR: [u64; 2] = [7, 8];
-const RETAILER: [u64; 2] = [9, 10];
+static PRODUCER: [u64; 2] = [5, 6];
+static DISTRIBUTOR: [u64; 2] = [7, 8];
+static RETAILER: [u64; 2] = [9, 10];
 
 #[test]
 fn ownership_and_role() {
@@ -170,7 +170,7 @@ fn query_roles() {
         },
     )
     .succeed();
-    supply_chain.meta_state().roles(FOREIGN_USER).eq([
+    supply_chain.state().roles(FOREIGN_USER).eq([
         Role::Consumer,
         Role::Producer,
         Role::Distributor,
@@ -191,7 +191,7 @@ fn query_roles() {
     )
     .succeed();
     supply_chain
-        .meta_state()
+        .state()
         .roles(FOREIGN_USER)
         .eq([Role::Consumer].into());
 }

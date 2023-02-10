@@ -18,52 +18,47 @@ init:
 
 lint:
 	@echo ⚙️ Running the linter...
-	@cargo +nightly clippy --workspace -- -D warnings
-	@cargo +nightly clippy \
-	--all-targets \
-	--workspace \
-	-Fbinary-vendor \
-	-- -D warnings
+	@cargo +nightly clippy --workspace --all-targets -- -D warnings
 
 pre-commit: fmt lint full-test
 
 deps:
 	@echo ⚙️ Downloading dependencies...
-	@path=target/ft_main.wasm;\
+	@path=target/ft-main.wasm;\
 	if [ ! -f $$path ]; then\
 	    curl -L\
 	        https://github.com/gear-dapps/sharded-fungible-token/releases/download/0.1.3/ft_main-0.1.3.opt.wasm\
 	        -o $$path;\
 	fi
-	@path=target/ft_logic.wasm;\
+	@path=target/ft-logic.wasm;\
 	if [ ! -f $$path ]; then\
 	    curl -L\
 	        https://github.com/gear-dapps/sharded-fungible-token/releases/download/0.1.3/ft_logic-0.1.3.opt.wasm\
 	        -o $$path;\
 	fi
-	@path=target/ft_storage.wasm;\
+	@path=target/ft-storage.wasm;\
 	if [ ! -f $$path ]; then\
 	    curl -L\
 	        https://github.com/gear-dapps/sharded-fungible-token/releases/download/0.1.3/ft_storage-0.1.3.opt.wasm\
 	        -o $$path;\
 	fi
+	@path=target/nft-state.wasm;\
+	if [ ! -f $$path ]; then\
+	    curl -L\
+	        https://github.com/gear-dapps/non-fungible-token/releases/download/0.2.8/nft_state-0.2.8.meta.wasm\
+	        -o $$path;\
+	fi
 	@path=target/nft.wasm;\
 	if [ ! -f $$path ]; then\
 	    curl -L\
-	        https://github.com/gear-dapps/non-fungible-token/releases/download/0.2.7/nft-0.2.7.wasm\
-	        -o $$path;\
-	fi
-	@path=target/nft.opt.wasm;\
-	if [ ! -f $$path ]; then\
-	    curl -L\
-	        https://github.com/gear-dapps/non-fungible-token/releases/download/0.2.7/nft-0.2.7.opt.wasm\
+	        https://github.com/gear-dapps/non-fungible-token/releases/download/0.2.8/nft-0.2.8.opt.wasm\
 	        -o $$path;\
 	fi
 
 test: deps
 	@echo ⚙️ Running unit tests...
-	@cargo +nightly t -Fbinary-vendor
+	@cargo +nightly t
 
 full-test: deps
 	@echo ⚙️ Running all tests...
-	@cargo +nightly t -Fbinary-vendor -- --include-ignored
+	@cargo +nightly t -- --include-ignored

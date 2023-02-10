@@ -103,11 +103,10 @@ impl<T: PartialEq + Clone> TransactionManager<T> {
         )
     }
 
-    pub fn cached_actions(&self) -> Vec<(ActorId, T)> {
+    pub fn cached_actions(&self) -> impl Iterator<Item = (&ActorId, &T)> {
         self.actors_for_tx
             .iter()
-            .map(|(actor, (_, action, _))| (*actor, action.clone()))
-            .collect()
+            .map(|(actor, (_, action, _))| (actor, action))
     }
 }
 

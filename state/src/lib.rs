@@ -1,7 +1,6 @@
 #![no_std]
 
-#[cfg(not(feature = "binary-vendor"))]
 mod state;
 
-#[cfg(feature = "binary-vendor")]
+#[cfg(feature = "dummy")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));

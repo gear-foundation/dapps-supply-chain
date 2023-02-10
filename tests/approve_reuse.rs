@@ -2,8 +2,8 @@ use utils::{prelude::*, FungibleToken, NonFungibleToken};
 
 pub mod utils;
 
-const ITEM_PRICE_BY_PRODUCER: u128 = ITEM_PRICE;
-const ITEM_PRICE_BY_DISTRIBUTOR: u128 = ITEM_PRICE * 2;
+static ITEM_PRICE_BY_PRODUCER: u128 = ITEM_PRICE;
+static ITEM_PRICE_BY_DISTRIBUTOR: u128 = ITEM_PRICE * 2;
 
 #[test]
 fn approve_reuse_and_ft_transfer() {
@@ -30,7 +30,7 @@ fn approve_reuse_and_ft_transfer() {
         .put_up_for_sale_by_producer(PRODUCER, 0, ITEM_PRICE_BY_PRODUCER)
         .succeed(0);
     supply_chain
-        .meta_state()
+        .state()
         .item_price(0)
         .eq(Some(ITEM_PRICE_BY_PRODUCER));
 
@@ -73,7 +73,7 @@ fn approve_reuse_and_ft_transfer() {
         .put_up_for_sale_by_distributor(DISTRIBUTOR, 0, ITEM_PRICE_BY_DISTRIBUTOR)
         .succeed(0);
     supply_chain
-        .meta_state()
+        .state()
         .item_price(0)
         .eq(Some(ITEM_PRICE_BY_DISTRIBUTOR));
 

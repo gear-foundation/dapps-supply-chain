@@ -12,4 +12,5 @@ supply-chain-io = { path = "../io" }
 gear-wasm-builder = { git = "https://github.com/gear-tech/gear.git", branch = "stable", features = ["metawasm"] }
 
 [features]
-binary-vendor = []
+default = ["dummy"]
+dummy = []

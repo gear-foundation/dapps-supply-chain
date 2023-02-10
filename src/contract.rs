@@ -1,6 +1,5 @@
 use gear_lib::non_fungible_token::token::TokenMetadata;
-use gmeta::Metadata;
-use gstd::{errors::Result as GstdResult, exec, msg, prelude::*, util, ActorId, MessageId};
+use gstd::{errors::Result as GstdResult, exec, msg, prelude::*, ActorId, MessageId};
 use hashbrown::{HashMap, HashSet};
 use supply_chain_io::*;
 use tx_manager::{TransactionGuard, TransactionManager};
@@ -373,7 +372,7 @@ static mut STATE: Option<(Contract, TransactionManager<CachedAction>)> = None;
 fn static_mut_state() -> &'static mut (Contract, TransactionManager<CachedAction>) {
     match unsafe { &mut STATE } {
         Some(state) => state,
-        None => unreachable!("State can't be uninitialized"),
+        None => unreachable!("state can't be uninitialized"),
     }
 }
 
@@ -386,7 +385,7 @@ extern "C" fn init() {
     let result = process_init();
     let is_err = result.is_err();
 
-    reply(result).expect("Failed to encode or reply with `Result<(), Error>` from `init()`");
+    reply(result).expect("failed to encode or reply from `init()`");
 
     if is_err {
         exec::exit(ActorId::zero());
@@ -434,8 +433,7 @@ fn process_init() -> Result<(), Error> {
 
 #[gstd::async_main]
 async fn main() {
-    reply(process_handle().await)
-        .expect("Failed to encode or reply with `Result<Event, Error>` from `handle()`");
+    reply(process_handle().await).expect("failed to encode or reply `handle()`");
 }
 
 async fn process_handle() -> Result<Event, Error> {
@@ -708,26 +706,7 @@ async fn process_handle() -> Result<Event, Error> {
 }
 
 #[no_mangle]
-extern "C" fn meta_state() -> *mut [i32; 2] {
-    let query = msg::load().expect("Failed to load or decode `StateQuery` from `meta_state()`");
-    let state = common_state();
-
-    let reply = match query {
-        StateQuery::ItemInfo(item_id) => StateReply::ItemInfo(state.item_info(item_id)),
-        StateQuery::Participants => StateReply::Participants(state.participants()),
-        StateQuery::Roles(actor) => StateReply::Roles(state.roles(actor)),
-        StateQuery::ExistingItems => StateReply::ExistingItems(state.items),
-        StateQuery::FungibleToken => StateReply::FungibleToken(state.fungible_token),
-        StateQuery::NonFungibleToken => StateReply::NonFungibleToken(state.non_fungible_token),
-        StateQuery::IsActionCached(actor, action) => {
-            StateReply::IsActionCached(state.is_action_cached(actor, action))
-        }
-    };
-
-    util::to_leak_ptr(reply.encode())
-}
-
-fn common_state() -> <ContractMetadata as Metadata>::State {
+extern "C" fn state() {
     let (
         Contract {
             items,
@@ -743,7 +722,7 @@ fn common_state() -> <ContractMetadata as Metadata>::State {
     let [producers, distributors, retailers] =
         [producers, distributors, retailers].map(|actors| actors.iter().cloned().collect());
 
-    State {
+    reply(State {
         items: items.iter().map(|item| (*item.0, item.1.info)).collect(),
 
         producers,
@@ -753,20 +732,17 @@ fn common_state() -> <ContractMetadata as Metadata>::State {
         fungible_token: *fungible_token,
         non_fungible_token: *non_fungible_token,
 
-        cached_actions: tx_manager.cached_actions(),
-    }
-}
-
-#[no_mangle]
-extern "C" fn state() {
-    reply(common_state()).expect(
-        "Failed to encode or reply with `<ContractMetadata as Metadata>::State` from `state()`",
-    );
+        cached_actions: tx_manager
+            .cached_actions()
+            .map(|(actor, action)| (*actor, *action))
+            .collect(),
+    })
+    .expect("failed to encode or reply from `state()`");
 }
 
 #[no_mangle]
 extern "C" fn metahash() {
     let metahash: [u8; 32] = include!("../.metahash");
 
-    reply(metahash).expect("Failed to encode or reply with `[u8; 32]` from `metahash()`");
+    reply(metahash).expect("failed to encode or reply from `metahash()`");
 }
