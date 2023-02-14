@@ -15,9 +15,11 @@ gear-lib = { git = "https://github.com/gear-dapps/gear-lib.git", tag = "0.3.4" }
 hashbrown = "0.13"
 
 [dev-dependencies]
-gtest = { git = "https://github.com/gear-tech/gear.git" }
+# TODO: pin to the "stable" branch when
+# https://github.com/gear-tech/gear/pull/2165 will be merged into it.
+gtest = { git = "https://github.com/gear-tech/gear.git", rev = "ed517d8" }
 gstd = { git = "https://github.com/gear-tech/gear.git", branch = "stable", features = ["debug"] }
-# TODO: remove a pin to the "stable" branch when building will be fixed.
+# TODO: remove a pin when building will be fixed.
 gclient = { git = "https://github.com/gear-tech/gear.git", branch = "stable" }
 sp-core-hashing = "5"
 subxt = { git = "https://github.com/paritytech/subxt", rev = "d41f6574", default-features = false }

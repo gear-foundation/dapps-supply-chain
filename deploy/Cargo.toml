@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-# TODO: remove a pin to the "stable" branch when building will be fixed.
+# TODO: remove a pin when building will be fixed.
 gclient = { git = "https://github.com/gear-tech/gear.git", branch = "stable" }
 gstd = { git = "https://github.com/gear-tech/gear.git", branch = "stable" }
 subxt = { git = "https://github.com/paritytech/subxt", rev = "d41f6574", default-features = false }
