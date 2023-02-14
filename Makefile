@@ -61,4 +61,6 @@ test: deps
 
 full-test: deps
 	@echo ⚙️ Running all tests...
-	@cargo +nightly t -- --include-ignored
+	# TODO: remove the `test-thread` option when multithread tests will be
+	# allowed.
+	@cargo +nightly t -- --include-ignored --test-threads=1
