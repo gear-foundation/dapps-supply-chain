@@ -29,7 +29,9 @@ pub struct State {
     pub fungible_token: ActorId,
     pub non_fungible_token: ActorId,
 
-    /// Used by [`StateQuery::IsActionCached`]. Also see [`TransactionKind`].
+    /// Used by
+    /// [`is_action_cached()`](../supply_chain_state/metafns/fn.is_action_cached.html).
+    /// Also see [`TransactionKind`].
     pub cached_actions: Vec<(ActorId, CachedAction)>,
 }
 
@@ -154,8 +156,9 @@ pub enum InnerAction {
 /// [`msg::source()`](gstd::msg::source) is cached.
 /// - Non-asynchronous actions are never cached.
 /// - There's no guarantee every underprocessed asynchronous action will be
-/// cached. Use the `is_action_cached()` metafunction to check if some action is
-/// cached for some [`ActorId`].
+/// cached. Use
+/// [`is_action_cached()`](../supply_chain_state/metafns/fn.is_action_cached.html)
+/// to check if some action is cached for some [`ActorId`].
 /// - It's possible to send a retry action with a different payload, and it'll
 /// continue with it because, for some action, not all payload is saved in the
 /// cache (see [`CachedAction`]).

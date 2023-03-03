@@ -3,7 +3,7 @@ use gstd::{prelude::*, ActorId};
 use gtest::{Program as InnerProgram, System, EXISTENTIAL_DEPOSIT};
 use hashbrown::{HashMap, HashSet};
 use supply_chain_io::*;
-use supply_chain_state::{WASM_BINARY as METAWASM_BINARY, WASM_EXPORTS as STATE_FNS};
+use supply_chain_state::{WASM_BINARY, WASM_EXPORTS};
 
 mod common;
 mod fungible_token;
@@ -410,7 +410,7 @@ impl SupplyChainState<'_> {
     ) -> StateReply<T> {
         StateReply(
             self.0
-                .read_state_using_wasm(STATE_FNS[fn_index], METAWASM_BINARY.into(), argument)
+                .read_state_using_wasm(WASM_EXPORTS[fn_index], WASM_BINARY.into(), argument)
                 .unwrap(),
         )
     }

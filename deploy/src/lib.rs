@@ -7,7 +7,7 @@ use subxt::{
     Error as SubxtError,
 };
 use supply_chain_io::*;
-use supply_chain_state::{WASM_BINARY as METAWASM_BINARY, WASM_EXPORTS as STATE_FNS};
+use supply_chain_state::{WASM_BINARY, WASM_EXPORTS};
 
 pub static FT_MAIN: &str = "target/ft-main.wasm";
 pub static FT_STORAGE: &str = "target/ft-storage.wasm";
@@ -186,8 +186,8 @@ impl Client {
         self.client
             .read_state_using_wasm::<_, bool>(
                 supply_chain_actor_id.into(),
-                STATE_FNS[7],
-                METAWASM_BINARY.into(),
+                WASM_EXPORTS[7],
+                WASM_BINARY.into(),
                 Some((ActorId::from(ALICE), action.clone().action)),
             )
             .await

@@ -5,7 +5,7 @@ use gclient::Result;
 use gear_lib::non_fungible_token::token::TokenMetadata;
 use gstd::prelude::*;
 use nft_io::InitNFT;
-use supply_chain::WASM_BINARY_OPT as WASM_BINARY;
+use supply_chain::WASM_BINARY_OPT;
 use supply_chain_io::*;
 
 #[tokio::test]
@@ -40,7 +40,7 @@ async fn state_consistency() -> Result<()> {
 
     let (supply_chain_actor_id, reply) = client
         .upload_program_and_wait_reply::<Result<(), Error>>(
-            WASM_BINARY.into(),
+            WASM_BINARY_OPT.into(),
             Initialize {
                 producers: vec![ALICE.into()],
                 distributors: vec![ALICE.into()],

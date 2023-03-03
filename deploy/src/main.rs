@@ -7,7 +7,7 @@ use primitive_types::U256;
 use supply_chain::WASM_BINARY_OPT as WASM_BINARY;
 use supply_chain_io::*;
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
     let matches = Command::new(env!("CARGO_PKG_NAME"))
         .arg(Arg::new("local").short('l').action(ArgAction::SetTrue))
