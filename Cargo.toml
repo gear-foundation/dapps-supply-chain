@@ -28,8 +28,8 @@ gear-wasm-builder = { git = "https://github.com/gear-tech/gear.git", branch = "t
 supply-chain-io = { path = "io" }
 
 [features]
-default = ["dummy"]
-dummy = []
+default = ["binary-vendor"]
+binary-vendor = []
 
 [workspace]
 members = ["state", "deploy"]

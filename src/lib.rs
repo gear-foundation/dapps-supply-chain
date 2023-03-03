@@ -3,13 +3,14 @@
 use gear_lib::non_fungible_token::token::TokenMetadata;
 use gstd::{errors::Result as GstdResult, exec, msg, prelude::*, ActorId, MessageId};
 use hashbrown::{HashMap, HashSet};
+use hint::unreachable_unchecked;
 use supply_chain_io::*;
 use tx_manager::{TransactionGuard, TransactionManager};
 
 mod tx_manager;
 mod utils;
 
-#[cfg(feature = "dummy")]
+#[cfg(feature = "binary-vendor")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
 fn get_mut_item(
@@ -374,10 +375,10 @@ impl Contract {
 
 static mut STATE: Option<(Contract, TransactionManager<CachedAction>)> = None;
 
-fn static_mut_state() -> &'static mut (Contract, TransactionManager<CachedAction>) {
+unsafe fn state_mut() -> &'static mut (Contract, TransactionManager<CachedAction>) {
     match unsafe { &mut STATE } {
         Some(state) => state,
-        None => unreachable!("state can't be uninitialized"),
+        None => unreachable_unchecked(),
     }
 }
 
@@ -448,7 +449,7 @@ async fn process_handle() -> Result<Event, Error> {
     } = msg::load()?;
 
     let msg_source = msg::source();
-    let (contract, tx_manager) = static_mut_state();
+    let (contract, tx_manager) = unsafe { state_mut() };
 
     match action {
         InnerAction::Consumer(action) => match action {
@@ -722,7 +723,7 @@ extern "C" fn state() {
             non_fungible_token,
         },
         tx_manager,
-    ) = static_mut_state();
+    ) = unsafe { state_mut() };
 
     let [producers, distributors, retailers] =
         [producers, distributors, retailers].map(|actors| actors.iter().cloned().collect());
