@@ -376,7 +376,7 @@ impl Contract {
 static mut STATE: Option<(Contract, TransactionManager<CachedAction>)> = None;
 
 unsafe fn state_mut() -> &'static mut (Contract, TransactionManager<CachedAction>) {
-    match unsafe { &mut STATE } {
+    match &mut STATE {
         Some(state) => state,
         None => unreachable_unchecked(),
     }
