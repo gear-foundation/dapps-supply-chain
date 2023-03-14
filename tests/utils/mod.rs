@@ -461,7 +461,9 @@ impl SupplyChainState<'_> {
 }
 
 fn bool_to_event(is_approved: bool) -> ItemEventState {
-    const EVENTS: [ItemEventState; 2] = [ItemEventState::ForSale, ItemEventState::Approved];
-
-    EVENTS[is_approved as usize]
+    if is_approved {
+        ItemEventState::Approved
+    } else {
+        ItemEventState::ForSale
+    }
 }
