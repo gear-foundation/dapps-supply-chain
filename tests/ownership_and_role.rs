@@ -3,9 +3,9 @@ use utils::{prelude::*, FungibleToken, NonFungibleToken};
 pub mod utils;
 
 // Pairs of participants are needed here to test ownership of items.
-static PRODUCER: [u64; 2] = [5, 6];
-static DISTRIBUTOR: [u64; 2] = [7, 8];
-static RETAILER: [u64; 2] = [9, 10];
+const PRODUCER: [u64; 2] = [5, 6];
+const DISTRIBUTOR: [u64; 2] = [7, 8];
+const RETAILER: [u64; 2] = [9, 10];
 
 #[test]
 fn ownership_and_role() {

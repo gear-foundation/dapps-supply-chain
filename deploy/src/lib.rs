@@ -13,10 +13,10 @@ use subxt::{
 use supply_chain_io::*;
 use supply_chain_state::{WASM_BINARY, WASM_EXPORTS};
 
-pub static FT_MAIN: &str = "target/ft-main.wasm";
-pub static FT_STORAGE: &str = "target/ft-storage.wasm";
-pub static FT_LOGIC: &str = "target/ft-logic.wasm";
-pub static NFT_BINARY: &str = "target/nft.wasm";
+pub const FT_MAIN: &str = "target/ft-main.wasm";
+pub const FT_STORAGE: &str = "target/ft-storage.wasm";
+pub const FT_LOGIC: &str = "target/ft-logic.wasm";
+pub const NFT_BINARY: &str = "target/nft.wasm";
 
 pub struct GearApiWrapper(GearApi);
 
@@ -220,7 +220,7 @@ impl<T: Deref<Target = GearApi>> Client<T> {
     }
 }
 
-pub static ALICE: [u8; 32] = [
+pub const ALICE: [u8; 32] = [
     212, 53, 147, 199, 21, 253, 211, 28, 97, 20, 26, 189, 4, 169, 159, 214, 130, 44, 133, 88, 133,
     76, 205, 227, 154, 86, 132, 231, 165, 109, 162, 125,
 ];

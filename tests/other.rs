@@ -4,7 +4,7 @@ pub mod utils;
 
 #[test]
 fn interact_with_unexistent_item() {
-    static NONEXISTENT_ITEM: u128 = 99999999;
+    const NONEXISTENT_ITEM: u128 = 99999999;
 
     let system = utils::initialize_system();
 

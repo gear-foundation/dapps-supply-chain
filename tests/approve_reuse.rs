@@ -2,8 +2,8 @@ use utils::{prelude::*, FungibleToken, NonFungibleToken};
 
 pub mod utils;
 
-static ITEM_PRICE_BY_PRODUCER: u128 = ITEM_PRICE;
-static ITEM_PRICE_BY_DISTRIBUTOR: u128 = ITEM_PRICE * 2;
+const ITEM_PRICE_BY_PRODUCER: u128 = ITEM_PRICE;
+const ITEM_PRICE_BY_DISTRIBUTOR: u128 = ITEM_PRICE * 2;
 
 #[test]
 fn approve_reuse_and_ft_transfer() {

@@ -2,11 +2,11 @@ use utils::{prelude::*, FungibleToken, NonFungibleToken};
 
 pub mod utils;
 
-static DELIVERY_TIME_IN_BLOCKS: u32 = (DELIVERY_TIME / 1000) as _;
+const DELIVERY_TIME_IN_BLOCKS: u32 = (DELIVERY_TIME / 1000) as _;
 
 #[test]
 fn delivery_wo_delay() {
-    static NO_DELAY: u32 = DELIVERY_TIME_IN_BLOCKS;
+    const NO_DELAY: u32 = DELIVERY_TIME_IN_BLOCKS;
 
     let system = utils::initialize_system();
 
@@ -68,8 +68,8 @@ fn delivery_wo_delay() {
 #[test]
 fn delivery_with_delay() {
     // Even and odd prices required for a reliable penalty calculation check.
-    static ITEM_PRICE: [u128; 2] = [123123, 12341234];
-    static DELAY: u32 = DELIVERY_TIME_IN_BLOCKS * 2 - 1;
+    const ITEM_PRICE: [u128; 2] = [123123, 12341234];
+    const DELAY: u32 = DELIVERY_TIME_IN_BLOCKS * 2 - 1;
 
     let system = utils::initialize_system();
 
@@ -138,7 +138,7 @@ fn delivery_with_delay() {
 
 #[test]
 fn delivery_with_big_delay() {
-    static BIG_DELAY: u32 = DELIVERY_TIME_IN_BLOCKS * 2;
+    const BIG_DELAY: u32 = DELIVERY_TIME_IN_BLOCKS * 2;
 
     let system = utils::initialize_system();
 

@@ -15,10 +15,10 @@ pub use common::initialize_system;
 pub use fungible_token::FungibleToken;
 pub use non_fungible_token::NonFungibleToken;
 
-pub static FOREIGN_USER: u64 = 1029384756123;
-pub static PRODUCER: u64 = 5;
-pub static DISTRIBUTOR: u64 = 7;
-pub static RETAILER: u64 = 9;
+pub const FOREIGN_USER: u64 = 1029384756123;
+pub const PRODUCER: u64 = 5;
+pub const DISTRIBUTOR: u64 = 7;
+pub const RETAILER: u64 = 9;
 
 type SupplyChainRunResult<T> = RunResult<T, Event, Error>;
 
@@ -461,7 +461,7 @@ impl SupplyChainState<'_> {
 }
 
 fn bool_to_event(is_approved: bool) -> ItemEventState {
-    static EVENTS: [ItemEventState; 2] = [ItemEventState::ForSale, ItemEventState::Approved];
+    const EVENTS: [ItemEventState; 2] = [ItemEventState::ForSale, ItemEventState::Approved];
 
     EVENTS[is_approved as usize]
 }

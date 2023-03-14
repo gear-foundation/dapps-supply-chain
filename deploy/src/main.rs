@@ -19,6 +19,7 @@ async fn main() -> Result<()> {
 
     if matches.get_flag("local") {
         if matches.contains_id("logic") {
+            // FIXME: https://github.com/gear-tech/gear/issues/2397.
             panic!("`GearApiWithNode` doesn't support logging in");
         }
 
