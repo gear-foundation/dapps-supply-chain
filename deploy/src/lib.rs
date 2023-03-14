@@ -1,5 +1,9 @@
+use std::ops::Deref;
+
 use fmt::Debug;
-use gclient::{Error as GclientError, EventListener, EventProcessor, GearApi, Result};
+use gclient::{
+    Error as GclientError, EventListener, EventProcessor, GearApi, GearApiWithNode, Node, Result,
+};
 use gstd::{prelude::*, ActorId};
 use primitive_types::H256;
 use subxt::{
@@ -14,32 +18,54 @@ pub static FT_STORAGE: &str = "target/ft-storage.wasm";
 pub static FT_LOGIC: &str = "target/ft-logic.wasm";
 pub static NFT_BINARY: &str = "target/nft.wasm";
 
-pub struct Client {
-    client: GearApi,
+pub struct GearApiWrapper(GearApi);
+
+impl Deref for GearApiWrapper {
+    type Target = GearApi;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+pub struct Client<T: Deref<Target = GearApi>> {
+    client: T,
     listener: EventListener,
 }
 
-impl Client {
+impl Client<GearApiWrapper> {
     pub async fn global() -> Result<Self> {
         let client = GearApi::gear().await?;
         let listener = client.subscribe().await?;
 
-        Ok(Self { client, listener })
+        Ok(Self {
+            client: GearApiWrapper(client),
+            listener,
+        })
     }
 
-    pub async fn local() -> Result<Self> {
-        let client = GearApi::dev().await.expect("running node wasn't found");
+    pub async fn login(mut self, suri: impl AsRef<str>) -> Result<Self> {
+        self.client = GearApiWrapper(self.client.0.with(suri)?);
+
+        Ok(self)
+    }
+}
+
+impl<'a> Client<GearApiWithNode<'a>> {
+    pub async fn local(node: &'a Node) -> Result<Client<GearApiWithNode<'a>>> {
+        let client = GearApi::node(node).await?;
         let listener = client.subscribe().await?;
 
         Ok(Self { client, listener })
     }
 
-    pub async fn login(mut self, suri: impl AsRef<str>) -> Result<Self> {
-        self.client = self.client.with(suri)?;
-
-        Ok(self)
+    pub fn node() -> Node {
+        // TODO: replace `.unwrap()` with `?`.
+        Node::try_from_path(env!("GEAR_NODE_PATH")).unwrap()
     }
+}
 
+impl<T: Deref<Target = GearApi>> Client<T> {
     pub async fn upload_code(&self, path: &str) -> Result<H256> {
         let code_id = match self.client.upload_code_by_path(path).await {
             Ok((code_id, _)) => code_id.into(),
@@ -74,11 +100,11 @@ impl Client {
         Ok(program_id)
     }
 
-    pub async fn upload_program_and_wait_reply<T: Decode>(
+    pub async fn upload_program_and_wait_reply<R: Decode>(
         &mut self,
         code: Vec<u8>,
         payload: impl Encode,
-    ) -> Result<([u8; 32], T)> {
+    ) -> Result<([u8; 32], R)> {
         let (message_id, program_id) = self.common_upload_program(code, payload).await?;
         let (_, raw_reply, _) = self.listener.reply_bytes_on(message_id.into()).await?;
         let reply = decode(
@@ -103,7 +129,7 @@ impl Client {
             .client
             .upload_program(
                 code,
-                gclient::now_in_micros().to_le_bytes(),
+                gclient::now_micros().to_le_bytes(),
                 payload,
                 gas_limit,
                 0,
@@ -113,23 +139,23 @@ impl Client {
         Ok((message_id.into(), program_id.into()))
     }
 
-    pub async fn send_message<T: Decode>(
+    pub async fn send_message<R: Decode>(
         &mut self,
         destination: [u8; 32],
         payload: impl Encode + Debug,
-    ) -> Result<T> {
+    ) -> Result<R> {
         Ok(self
             .send_message_with_custom_limit(destination, payload, |gas| gas * 2)
             .await?
             .expect("action failed, received an error message instead of a reply"))
     }
 
-    pub async fn send_message_with_custom_limit<T: Decode>(
+    pub async fn send_message_with_custom_limit<R: Decode>(
         &mut self,
         destination: [u8; 32],
         payload: impl Encode + Debug,
         modify_gas_limit: fn(u64) -> u64,
-    ) -> Result<Result<T, String>> {
+    ) -> Result<Result<R, String>> {
         let encoded_payload = payload.encode();
         let destination = destination.into();
 

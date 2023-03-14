@@ -41,7 +41,13 @@ impl<T: PartialEq + Clone> TransactionManager<T> {
                         .txs_for_actor
                         .range(self.tx_id_nonce..)
                         .next()
-                        .unwrap_or_else(|| self.txs_for_actor.first_key_value().unwrap());
+                        .unwrap_or_else(|| {
+                            let key_value = self.txs_for_actor.first_key_value();
+
+                            debug_assert!(key_value.is_some(), "tx cache cycle is corrupted, perhaps the `MAX_NUMBER_OF_TXS` constant is less than 2");
+
+                            unsafe { key_value.unwrap_unchecked() }
+                        });
                     let (tx, actor) = (*tx, *actor);
 
                     self.txs_for_actor.remove(&tx);

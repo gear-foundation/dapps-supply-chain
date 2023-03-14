@@ -13,6 +13,6 @@ supply-chain = { path = ".." }
 sp-core-hashing = "6"
 primitive-types = "0.12"
 nft-io = { git = "https://github.com/gear-dapps/non-fungible-token.git", tag = "0.2.9" }
-ft-main-io = { git = "https://github.com/gear-dapps/sharded-fungible-token.git", tag = "0.1.4" }
+ft-main-io = { git = "https://github.com/gear-dapps/sharded-fungible-token.git", tag = "0.1.5" }
 tokio = "1"
 clap = { version = "4", default-features = false, features = ["std"] }

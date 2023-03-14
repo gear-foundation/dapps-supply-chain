@@ -3,7 +3,6 @@
 use gear_lib::non_fungible_token::token::TokenMetadata;
 use gstd::{errors::Result as GstdResult, exec, msg, prelude::*, ActorId, MessageId};
 use hashbrown::{HashMap, HashSet};
-use hint::unreachable_unchecked;
 use supply_chain_io::*;
 use tx_manager::{TransactionGuard, TransactionManager};
 
@@ -28,23 +27,31 @@ fn get_mut_item(
 }
 
 fn role_to_set_item_dr(role: Role) -> fn(&mut Item, ActorId) {
-    const FNS: [fn(&mut Item, ActorId); 2] = [Item::set_distributor, Item::set_retailer];
-
-    FNS[role as usize - 1]
+    match role {
+        Role::Distributor => Item::set_distributor,
+        Role::Retailer => Item::set_retailer,
+        _ => unreachable!(),
+    }
 }
 
 type IsPdr = fn(&Item, ActorId) -> Result<(), Error>;
 
 fn role_to_is_pdr(role: Role) -> IsPdr {
-    const FNS: [IsPdr; 3] = [Item::is_producer, Item::is_distributor, Item::is_retailer];
-
-    FNS[role as usize]
+    match role {
+        Role::Producer => Item::is_producer,
+        Role::Distributor => Item::is_distributor,
+        Role::Retailer => Item::is_retailer,
+        _ => unreachable!(),
+    }
 }
 
 fn role_to_item_pdr(role: Role) -> fn(&Item) -> ActorId {
-    const FNS: [fn(&Item) -> ActorId; 3] = [Item::producer, Item::distributor, Item::retailer];
-
-    FNS[role as usize]
+    match role {
+        Role::Producer => Item::producer,
+        Role::Distributor => Item::distributor,
+        Role::Retailer => Item::retailer,
+        _ => unreachable!(),
+    }
 }
 
 #[derive(Default)]
@@ -375,11 +382,12 @@ impl Contract {
 
 static mut STATE: Option<(Contract, TransactionManager<CachedAction>)> = None;
 
-unsafe fn state_mut() -> &'static mut (Contract, TransactionManager<CachedAction>) {
-    match &mut STATE {
-        Some(state) => state,
-        None => unreachable_unchecked(),
-    }
+fn state_mut() -> &'static mut (Contract, TransactionManager<CachedAction>) {
+    let state = unsafe { STATE.as_mut() };
+
+    debug_assert!(state.is_some(), "state isn't initialized");
+
+    unsafe { state.unwrap_unchecked() }
 }
 
 fn reply(payload: impl Encode) -> GstdResult<MessageId> {
@@ -449,7 +457,7 @@ async fn process_handle() -> Result<Event, Error> {
     } = msg::load()?;
 
     let msg_source = msg::source();
-    let (contract, tx_manager) = unsafe { state_mut() };
+    let (contract, tx_manager) = state_mut();
 
     match action {
         InnerAction::Consumer(action) => match action {
@@ -723,7 +731,7 @@ extern "C" fn state() {
             non_fungible_token,
         },
         tx_manager,
-    ) = unsafe { state_mut() };
+    ) = state_mut();
 
     let [producers, distributors, retailers] =
         [producers, distributors, retailers].map(|actors| actors.iter().cloned().collect());
