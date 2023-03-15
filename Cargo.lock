@@ -1131,7 +1131,7 @@ dependencies = [
 [[package]]
 name = "gclient"
 version = "0.1.0"
-source = "git+https://github.com/gear-tech/gear.git#e440f738f30bf5de72117f3c1622f0028261b6b6"
+source = "git+https://github.com/gear-tech/gear.git#f7ce4ee4b52b7517aee82a71bbd13ecc0cec7a98"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1211,7 +1211,7 @@ dependencies = [
 [[package]]
 name = "gear-core"
 version = "0.1.0"
-source = "git+https://github.com/gear-tech/gear.git#e440f738f30bf5de72117f3c1622f0028261b6b6"
+source = "git+https://github.com/gear-tech/gear.git#f7ce4ee4b52b7517aee82a71bbd13ecc0cec7a98"
 dependencies = [
  "blake2-rfc",
  "derive_more",
@@ -1240,7 +1240,7 @@ dependencies = [
 [[package]]
 name = "gear-core-errors"
 version = "0.1.0"
-source = "git+https://github.com/gear-tech/gear.git#e440f738f30bf5de72117f3c1622f0028261b6b6"
+source = "git+https://github.com/gear-tech/gear.git#f7ce4ee4b52b7517aee82a71bbd13ecc0cec7a98"
 dependencies = [
  "derive_more",
  "enum-iterator",
@@ -1286,7 +1286,7 @@ dependencies = [
 [[package]]
 name = "gear-utils"
 version = "0.1.0"
-source = "git+https://github.com/gear-tech/gear.git#e440f738f30bf5de72117f3c1622f0028261b6b6"
+source = "git+https://github.com/gear-tech/gear.git#f7ce4ee4b52b7517aee82a71bbd13ecc0cec7a98"
 dependencies = [
  "env_logger",
  "nonempty",
@@ -1322,7 +1322,7 @@ dependencies = [
 [[package]]
 name = "gear-wasm-instrument"
 version = "0.1.0"
-source = "git+https://github.com/gear-tech/gear.git#e440f738f30bf5de72117f3c1622f0028261b6b6"
+source = "git+https://github.com/gear-tech/gear.git#f7ce4ee4b52b7517aee82a71bbd13ecc0cec7a98"
 dependencies = [
  "enum-iterator",
  "wasm-instrument",
@@ -1419,7 +1419,7 @@ dependencies = [
 [[package]]
 name = "gsdk"
 version = "0.1.0"
-source = "git+https://github.com/gear-tech/gear.git#e440f738f30bf5de72117f3c1622f0028261b6b6"
+source = "git+https://github.com/gear-tech/gear.git#f7ce4ee4b52b7517aee82a71bbd13ecc0cec7a98"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -3862,9 +3862,9 @@ dependencies = [
 
 [[package]]
 name = "toml_edit"
-version = "0.19.6"
+version = "0.19.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08de71aa0d6e348f070457f85af8bd566e2bc452156a423ddf22861b3a953fae"
+checksum = "dc18466501acd8ac6a3f615dd29a3438f8ca6bb3b19537138b3106e575621274"
 dependencies = [
  "indexmap",
  "serde",
@@ -4553,9 +4553,9 @@ checksum = "9aec5da331524158c6d1a4ac0ab1541149c0b9505fde06423b02f5ef0106b9f0"
 
 [[package]]
 name = "winnow"
-version = "0.3.5"
+version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee7b2c67f962bf5042bfd8b6a916178df33a26eec343ae064cb8e069f638fa6f"
+checksum = "23d020b441f92996c80d94ae9166e8501e59c7bb56121189dc9eab3bd8216966"
 dependencies = [
  "memchr",
 ]

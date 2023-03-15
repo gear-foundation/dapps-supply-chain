@@ -54,26 +54,26 @@ impl<'a> SupplyChain<'a> {
         system: &'a System,
         config: Initialize,
     ) -> InitResult<SupplyChain<'a>, Error> {
-        Self::common_initialize_custom(system, config, |_, _| {})
+        Self::common_initialize_custom(system, config, false)
     }
 
     pub fn initialize_custom_with_existential_deposit(
         system: &'a System,
         config: Initialize,
     ) -> InitResult<SupplyChain<'a>, Error> {
-        Self::common_initialize_custom(system, config, |system, program| {
-            system.mint_to(program.id(), EXISTENTIAL_DEPOSIT)
-        })
+        Self::common_initialize_custom(system, config, true)
     }
 
     fn common_initialize_custom(
         system: &'a System,
         config: Initialize,
-        mint: fn(&System, &InnerProgram),
+        is_exdep_needed: bool,
     ) -> InitResult<SupplyChain<'a>, Error> {
         let program = InnerProgram::current(system);
 
-        mint(system, &program);
+        if is_exdep_needed {
+            system.mint_to(program.id(), EXISTENTIAL_DEPOSIT);
+        }
 
         let result = program.send(FOREIGN_USER, config);
         let is_active = system.is_active_program(program.id());
