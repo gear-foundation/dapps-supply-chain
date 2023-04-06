@@ -30,8 +30,14 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2023-03-14
           components: clippy, rustfmt
           target: wasm32-unknown-unknown
+        run: |
+          rm -rf ~/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu
+          ln -s ~/.rustup/toolchains/nightly-2023-03-14-x86_64-unknown-linux-gnu ~/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu
 
       - name: Install binaryen
         run: |
