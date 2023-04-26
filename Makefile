@@ -46,19 +46,19 @@ deps:
 	@path=target/ft-main.wasm;\
 	if [ ! -f $$path ]; then\
 	    curl -L\
-	        https://github.com/gear-dapps/sharded-fungible-token/releases/download/2.1.1/ft_main-2.1.1.opt.wasm\
+	        https://github.com/gear-dapps/sharded-fungible-token/releases/download/2.1.1/ft_main.opt.wasm\
 	        -o $$path;\
 	fi
 	@path=target/ft-logic.wasm;\
 	if [ ! -f $$path ]; then\
 	    curl -L\
-	        https://github.com/gear-dapps/sharded-fungible-token/releases/download/2.1.1/ft_logic-2.1.1.opt.wasm\
+	        https://github.com/gear-dapps/sharded-fungible-token/releases/download/2.1.1/ft_logic.opt.wasm\
 	        -o $$path;\
 	fi
 	@path=target/ft-storage.wasm;\
 	if [ ! -f $$path ]; then\
 	    curl -L\
-	        https://github.com/gear-dapps/sharded-fungible-token/releases/download/2.1.1/ft_storage-2.1.1.opt.wasm\
+	        https://github.com/gear-dapps/sharded-fungible-token/releases/download/2.1.1/ft_storage.opt.wasm\
 	        -o $$path;\
 	fi
 	@path=target/nft-state.wasm;\
