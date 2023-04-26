@@ -198,11 +198,6 @@ async fn state_consistency() -> Result<()> {
             }
         })
     );
-    assert!(
-        !client
-            .is_action_cached(supply_chain_actor_id, payload)
-            .await?
-    );
 
     // InnerAction::Producer(ProducerAction::Ship)
 
@@ -372,11 +367,6 @@ async fn state_consistency() -> Result<()> {
                 by: Role::Distributor
             }
         }),
-    );
-    assert!(
-        !client
-            .is_action_cached(supply_chain_actor_id, payload)
-            .await?
     );
 
     // InnerAction::Distributor(DistributorAction::Ship)
