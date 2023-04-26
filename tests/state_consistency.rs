@@ -1,6 +1,5 @@
 use deploy::*;
-use ft_logic_io::Action as FTAction;
-use ft_main_io::{FTokenAction, FTokenEvent, InitFToken};
+use ft_main_io::{FTokenAction, FTokenEvent, InitFToken, LogicAction};
 use gclient::Result;
 use gear_lib::non_fungible_token::token::TokenMetadata;
 use gstd::prelude::*;
@@ -69,11 +68,10 @@ async fn state_consistency() -> Result<()> {
                     ft_actor_id,
                     FTokenAction::Message {
                         transaction_id: 0,
-                        payload: FTAction::Mint {
+                        payload: LogicAction::Mint {
                             recipient: ALICE.into(),
                             amount: price
-                        }
-                        .encode(),
+                        },
                     },
                 )
                 .await?
@@ -85,11 +83,10 @@ async fn state_consistency() -> Result<()> {
                     ft_actor_id,
                     FTokenAction::Message {
                         transaction_id: 1,
-                        payload: FTAction::Approve {
+                        payload: LogicAction::Approve {
                             approved_account: supply_chain_actor_id.into(),
                             amount: price * 3,
-                        }
-                        .encode(),
+                        },
                     },
                 )
                 .await?
