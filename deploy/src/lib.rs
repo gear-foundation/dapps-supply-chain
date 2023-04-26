@@ -7,7 +7,7 @@ use gclient::{
 use gstd::{prelude::*, ActorId};
 use primitive_types::H256;
 use subxt::{
-    error::{DispatchError, ModuleError, ModuleErrorData},
+    error::{DispatchError, ModuleError},
     Error as SubxtError,
 };
 use supply_chain_io::*;
