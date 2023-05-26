@@ -5,7 +5,6 @@ use gtest::{Log, Program as InnerProgram, RunResult as InnerRunResult, System};
 use hash::Hash;
 use hashbrown::HashSet;
 use marker::PhantomData;
-use pretty_assertions::assert_eq;
 
 pub fn initialize_system() -> System {
     let system = System::new();
