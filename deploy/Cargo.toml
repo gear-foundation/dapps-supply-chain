@@ -12,7 +12,7 @@ supply-chain-state = { path = "../state" }
 supply-chain = { path = ".." }
 sp-core-hashing = "6"
 primitive-types = "0.12"
-nft-io = { git = "https://github.com/gear-dapps/non-fungible-token.git", tag = "0.2.10" }
+nft-io = { git = "https://github.com/gear-dapps/non-fungible-token.git", tag = "0.2.11" }
 ft-main-io = { git = "https://github.com/gear-dapps/sharded-fungible-token.git", tag = "2.1.1" }
 tokio = "1"
 clap = { version = "4", default-features = false, features = ["std"] }
