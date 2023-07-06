@@ -10,7 +10,7 @@ subxt = { version = "0.27", default-features = false }
 supply-chain-io = { path = "../io" }
 supply-chain-state = { path = "../state" }
 supply-chain = { path = ".." }
-sp-core-hashing = "6"
+sp-core-hashing = "9"
 primitive-types = "0.12"
 nft-io = { git = "https://github.com/gear-dapps/non-fungible-token.git", tag = "0.2.10" }
 ft-main-io = { git = "https://github.com/gear-dapps/sharded-fungible-token.git", tag = "2.1.1" }
