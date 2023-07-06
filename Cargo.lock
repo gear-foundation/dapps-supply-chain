@@ -721,7 +721,7 @@ dependencies = [
  "gstd",
  "nft-io",
  "primitive-types",
- "sp-core-hashing 6.0.0",
+ "sp-core-hashing 9.0.0",
  "subxt",
  "supply-chain",
  "supply-chain-io",
@@ -3223,6 +3223,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "sp-core-hashing"
+version = "9.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ee599a8399448e65197f9a6cee338ad192e9023e35e31f22382964c3c174c68"
+dependencies = [
+ "blake2b_simd",
+ "byteorder",
+ "digest 0.10.6",
+ "sha2 0.10.6",
+ "sha3",
+ "sp-std 8.0.0",
+ "twox-hash",
+]
+
+[[package]]
 name = "sp-debug-derive"
 version = "5.0.0"
 source = "git+https://github.com/gear-tech/substrate.git?branch=gear-polkadot-v0.9.41-sign-ext#63dc4631644562e998891dc8591b34121fdb1fb2"
@@ -3377,6 +3392,12 @@ name = "sp-std"
 version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af0ee286f98455272f64ac5bb1384ff21ac029fbb669afbaf48477faff12760e"
+
+[[package]]
+name = "sp-std"
+version = "8.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "53458e3c57df53698b3401ec0934bea8e8cfce034816873c0b0abbd83d7bac0d"
 
 [[package]]
 name = "sp-storage"
