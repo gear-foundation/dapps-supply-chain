@@ -3,7 +3,7 @@ use fmt::Debug;
 use gstd::{prelude::*, ActorId};
 use gtest::{Log, Program as InnerProgram, RunResult as InnerRunResult, System};
 use hash::Hash;
-use hashbrown::HashSet;
+use hashbrown::{HashMap, HashSet};
 use marker::PhantomData;
 
 pub fn initialize_system() -> System {
@@ -141,5 +141,6 @@ impl<T, E: Encode> InitResult<T, E> {
 
 #[track_caller]
 fn assert_contains(result: &InnerRunResult, payload: impl Encode) {
+    assert!(!result.main_failed());
     assert!(result.contains(&Log::builder().payload(payload)));
 }
