@@ -13,7 +13,7 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  GEAR_NODE_APTH: ./gear
+  GEAR_NODE_PATH: ./gear
 
 jobs:
   docs:
